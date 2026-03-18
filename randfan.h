@@ -189,7 +189,7 @@ int det(int *M, int dim) {
         }
 
         // Laplace expansion
-        out += sign*M[n* i+0]*det(M_trim, n-1);
+        out += sign*M[dim* i+0]*det(M_trim, dim-1);
     }
 
     return out;
