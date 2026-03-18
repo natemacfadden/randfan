@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 // this is a demo of randfan.h
 
@@ -48,6 +49,20 @@ int main(int argc, char **argv) {
         if (i%dim==dim-1)
             printf("\n");
     }
+
+
+
+    // get random fine, regular triangulation
+    // --------------------------------------
+    int max_num_simps = 1000000;
+    uint32_t* simps   = malloc(max_num_simps * sizeof(uint32_t));
+    uint32_t num_simps;
+
+    uint32_t seed = 0;
+    int retval = randfan(
+        vecs, dim, num_vecs,
+        max_num_simps, seed,
+        simps, &num_simps);
 
     return 0;
 }
