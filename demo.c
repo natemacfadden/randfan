@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// this is a demo of regfan.h
+// this is a demo of randfan.h
 
 int main(int argc, char **argv) {
     // parse input vectors
