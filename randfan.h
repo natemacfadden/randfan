@@ -46,7 +46,7 @@ int randfan(
 #include <stdio.h>
 
 // HELPER METHODS (copied in full; modifications marked)
-// ==============
+// --------------
 /*  Written in 2018 by David Blackman and Sebastiano Vigna (vigna@acm.org)
 
 To the extent possible under law, the author has dedicated all copyright
@@ -164,6 +164,7 @@ void fisher_yates(uint32_t * lis, uint32_t len, uint64_t* rng_state) {
         uint32_t tmp = lis[i]; lis[i] = lis[j]; lis[j] = tmp;
     }
 }
+
 
 // H-REP OF N-1 SIMPLEX
 // ====================
@@ -293,77 +294,85 @@ int randfan(
     s[0] = splitmix64(&seed);
     s[1] = splitmix64(&seed);
 
-    // indices
-    uint32_t inds[num_vecs];
+    // labels, defined as 0,1,...,num_vecs-1
+    uint32_t labels[num_vecs];
     for (uint32_t i = 0; i < num_vecs; i++)
-        inds[i] = i;
+        labels[i] = i;
 
-    // Fisher-Yates shuffling
-    fisher_yates(inds, num_vecs, s);
+    // shuffle the labels using Fisher-Yates
+    fisher_yates(labels, num_vecs, s);
 
     // get an initial simplex
-    uint32_t seed_simp[dim];
-    for (int i=0; i<dim; ++i)
-        seed_simp[i] = i;
-
-    // DEBUG PRINT HREP
-    int seed_simp_H[dim*dim];
+    // ----------------------
     int seed_simp_R[dim*dim];
-    printf("[");
-    for (int i=0; i<dim; ++i) {
+    int seed_simp_H[dim*dim];
+
+    // begin with seed_simp = labels[0],labels[1],labels[2],...
+    uint32_t _inds[dim]; // indices into the shuffled labels... defines simplex
+    for (int i=0; i<dim; ++i) _inds[i] = i;
+
+    printf("Looking for initial simplex...");
+    while (1) {
+        // for retrying next iteration w/ goto
+        begin_loop:
+
+        // check if the current simplex contains no other vectors
         printf("[");
-        for (int j=0; j<dim; ++j) {
-            seed_simp_R[dim* i+j] = vecs[dim* seed_simp[i]+j];
-            printf("%d,",seed_simp_R[dim* i+j]);
-        }
-        printf("],");
-    }
-    printf("]\n");
-    hrep(seed_simp_R, dim, seed_simp_H);
+        for (int i=0; i<dim; ++i)
+            printf("%d,",labels[_inds[i]]);
+        printf("], ");
 
-    printf("[");
-    for (int i=0; i<dim; ++i) {
-        printf("[");
-        for (int j=0; j<dim; ++j) {
-            printf("%d,",seed_simp_H[dim* i+j]);
-        }
-        printf("],");
-    }
-    printf("]\n");
-
-    return 0;
-
-
-
-
-    // DEBUG PRINT NORMAL
-    int normal[dim];
-    simp_facet_normal(vecs, dim, normal);
-    for (int i=0; i<dim; ++i) {
-        printf("%d,",normal[i]);
-    }
-    printf("\n");
-
-    // DEBUG PRINT vecs
-    int vi;
-    printf("[");
-    for (int ii=0; ii<num_vecs; ++ii) {
-        vi = inds[ii]; // this allows the index list to shuffle
-
-        // DEBUG
-        if (1) {
-            printf("[");
-            for (int di=0; di<dim; ++di) {
-                printf("%d,",vecs[di + vi*dim]);
+        // get the H-representation
+        for (int i=0; i<dim; ++i) {
+            for (int j=0; j<dim; ++j) {
+                seed_simp_R[dim* i+j] = vecs[dim* labels[_inds[i]]+j];
             }
-            printf("],");
-        } else if (1) {
-            printf("%d,", vi);
         }
-        
-    }
-    printf("]\n");
+        hrep(seed_simp_R, dim, seed_simp_H);
 
+        // check if any other vector is included in this cone
+        for (int ilabel=0; ilabel<num_vecs; ++ilabel){
+            // skip if this label corresponds to one explicitly in the simp
+            int skip = 0;
+            for (int isimp=0; isimp<dim; ++isimp) {
+                if (ilabel == _inds[isimp]) {
+                    skip = 1;
+                    break;
+                }
+            }
+            if (skip == 1) continue;
+
+            // label isn't part of simp - check if it's geometrically inside
+            int label = labels[ilabel];
+            int bad = 1;
+            for (int ifacet=0; ifacet<dim; ++ifacet) {
+                int dot = 0;
+                for (int k=0; k<dim; ++k)
+                    dot += seed_simp_H[dim* ifacet+k] * vecs[dim* label+k];
+                bad = bad && (dot>=0);
+            }
+
+            // label is geomerically inside :( update _inds and retry
+            if (bad == 1){
+                // increment the indices corresponding to the simplex
+                for (int i=0; i<dim-1; ++i) {
+                    if (_inds[i]+1 < _inds[i+1]) {
+                        _inds[i] += 1;
+                        goto begin_loop; // retry!
+                    }
+                }
+
+                // no hits for i<dim-1... must set i=dim-1
+                for (int i=0; i<dim-1; ++i) _inds[i] = i;
+                _inds[dim-1] += 1;
+                goto begin_loop; // retry!
+            }
+        }
+
+        // no bad vectors!
+        printf(":)\n");
+        break;
+    }
     return 0;
 }
 
