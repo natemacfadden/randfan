@@ -272,6 +272,13 @@ void simp_facet_normal(int *R, int dim, int *x) {
     }
 }
 
+int dot(int *a, int *b, int dim) {
+    int out = 0;
+    for (int i=0; i<dim; ++i)
+        out += a[i]*b[i];
+    return out;
+}
+
 void hrep(int *R, int dim, int *H) {
     // get the inwards-facing H-representation of the simplex
     // (iterate over all facets, get the normal, orient so it faces inwards)
@@ -291,11 +298,9 @@ void hrep(int *R, int dim, int *H) {
         simp_facet_normal(R_facet, dim, &H[i*dim]);
 
         // ensure it is inwards-facing
-        int dot  = 0;
-        for (int k=0; k<dim; ++k)
-            dot += H[i*dim + k] * R[dim* i+k];
+        int dotted = dot(&H[dim*i],&R[dim*i],dim);
 
-        if (dot<0) {
+        if (dotted<0) {
             for (int k=0; k<dim; ++k)
                 H[i*dim+k] *= -1;
         }
@@ -317,13 +322,14 @@ int simp_contains(Simplex *simp, int *vecs, int dim, int *labels, int num_labels
 
         // check if label is in conical hull
         int bad = 1;
-        int dot;
+        int dotted;
         for (int ifacet=0; ifacet<dim; ++ifacet) {
-            dot = 0;
-            for (int k=0; k<dim; ++k) {
-                dot += simp->normals[MAX_DIM* ifacet+k] * vecs[dim* label+k];
-            }
-            bad = bad && (dot>=0);
+            dotted = dot(
+                &(simp->normals[MAX_DIM*ifacet]),
+                &vecs[dim*label],
+                dim);
+
+            bad = bad && (dotted>=0);
         }
 
         // label *is* in conical hull :(
@@ -476,6 +482,7 @@ int randfan(
 
     // build other simplices
     // ---------------------
+    return 0;
     while (num_labels > 0) {
         // re-shuffle the labels
         fisher_yates(labels, num_labels, s);
@@ -483,6 +490,11 @@ int randfan(
         // try pushing each label
         for (int ilabel=0; ilabel<num_labels; ++ilabel) {
             // COMPUTE VISIBLE FACETS
+            /*
+            for simp in simps:
+                for i in range(num_external_facets):
+                    n = simp.facets[i]
+            */
 
             // CHECK IF SIMPLEX cup labels[ilabel] CONTAINS ANYONE ELSE
 
