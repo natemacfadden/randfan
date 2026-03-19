@@ -399,7 +399,7 @@ int randfan(
             // next iter if this label corresponds to one explicitly in the simp
             int skip = 0;
             for (int isimp=0; isimp<dim; ++isimp) {
-                if (label == (int)simp_labels[isimp]) skip = 1; break;
+                if (label == (int)simp_labels[isimp]) {skip = 1; break;}
             }
             if (skip == 1) continue;
 
@@ -428,11 +428,6 @@ int randfan(
                 goto begin_loop; // retry!
             }
         }
-
-        printf(":)\n");
-        printf(":)\n");
-        printf(":)\n");
-        printf(":)\n");
 
         // no bad vectors!
         // save as formal simplex
