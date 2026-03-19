@@ -32,6 +32,8 @@ Does so via pushing-style arguments.
 
 **Returns:**
 A status code according to following list:
+    0:  success
+    -1: couldn't find seed simplex
     FILL IN
 */
 int randfan(
@@ -41,7 +43,7 @@ int randfan(
     int max_num_simps,
     uint64_t seed,
     uint32_t *simps,
-    uint32_t *num_simps
+    int *num_simps
 );
 
 
@@ -125,7 +127,7 @@ void jump(uint64_t s[4]) {
     uint64_t s1 = 0;
     uint64_t s2 = 0;
     uint64_t s3 = 0;
-    for(int i = 0; i < sizeof JUMP / sizeof *JUMP; i++)
+    for(int i = 0; i < (int)(sizeof JUMP / sizeof *JUMP); i++)
         for(int b = 0; b < 64; b++) {
             if (JUMP[i] & UINT64_C(1) << b) {
                 s0 ^= s[0];
@@ -156,7 +158,7 @@ void long_jump(uint64_t s[4]) {
     uint64_t s1 = 0;
     uint64_t s2 = 0;
     uint64_t s3 = 0;
-    for(int i = 0; i < sizeof LONG_JUMP / sizeof *LONG_JUMP; i++)
+    for(int i = 0; i < (int)(sizeof LONG_JUMP / sizeof *LONG_JUMP); i++)
         for(int b = 0; b < 64; b++) {
             if (LONG_JUMP[i] & UINT64_C(1) << b) {
                 s0 ^= s[0];
@@ -183,12 +185,12 @@ uint64_t splitmix64(uint64_t *state) {
 }
 
 // Fisher-Yates (shuffle list)
-void fisher_yates(uint32_t * lis, uint32_t len, uint64_t* rng_state) {
+void fisher_yates(int * lis, int len, uint64_t* rng_state) {
     uint64_t j;
 
     for (int i=len-1; i>=0; --i) {
         j = next(rng_state) % (i+1); // get a random index to swap
-        uint32_t tmp = lis[i]; lis[i] = lis[j]; lis[j] = tmp;
+        int tmp = lis[i]; lis[i] = lis[j]; lis[j] = tmp;
     }
 }
 
@@ -351,7 +353,7 @@ int randfan(
     int max_num_simps,
     uint64_t seed,
     uint32_t *simps,
-    uint32_t *num_simps)
+    int *num_simps)
 {
     /*
     **Description:**
@@ -375,6 +377,7 @@ int randfan(
 
     **Returns:**
     A status code according to following list:
+        0:  success
         -1: couldn't find initial simplex
         FILL IN
     */
@@ -382,8 +385,8 @@ int randfan(
     // ---------------------
     int return_code = 0;
 
-    uint32_t labels[num_vecs]; // labels, defined as 0,1,...,num_vecs-1
-    for (uint32_t i = 0; i < num_vecs; i++) labels[i] = i;
+    int labels[num_vecs]; // labels, defined as 0,1,...,num_vecs-1
+    for (int i = 0; i < num_vecs; i++) labels[i] = i;
 
     *num_simps      = 0;
     Simplex *_simps = malloc(max_num_simps * sizeof(Simplex)); // internal use
@@ -405,13 +408,13 @@ int randfan(
     fisher_yates(labels, num_vecs, s);
 
     // begin with seed_simp = labels[0],labels[1],labels[2],...
-    uint32_t _inds[dim]; // indices into the shuffled labels... defines simplex
+    int _inds[dim]; // indices into the shuffled labels... defines simplex
     for (int i=0; i<dim; ++i) _inds[i] = i;
 
     printf("Looking for initial simplex...");
     while (1) {
         // for retrying next iteration w/ goto
-        begin_seed:
+        begin_seed:;
 
         // get simplex labels
         int simp_labels[dim];
@@ -443,8 +446,8 @@ int randfan(
             simp->external_facet_inds[i] = i; // all facets begin as external
             for (int j=0; j<dim; ++j)
                 simp->normals[MAX_DIM* i+j] = seed_simp_H[dim* i+j];
-            simp->num_external_facets = dim;
         }
+        simp->num_external_facets = dim;
 
         // check if any other vector is included in this cone
         // --------------------------------------------------
@@ -461,7 +464,7 @@ int randfan(
 
             // exhausted all combinations... error
             // (shouldn't ever hit though)
-            if (i < 0) return -1;
+            if (i < 0) {return_code=-1; goto end;}
 
             // update the index i
             _inds[i]++;
@@ -496,8 +499,8 @@ int randfan(
     // build other simplices
     // ---------------------
     int external_numfacets;
-    int external_isimp[MAX_DIM];
-    int external_ifacet[MAX_DIM];
+    int external_isimp[max_num_simps * dim];
+    int external_ifacet[max_num_simps * dim];
 
     while (num_labels > 0) {
         // re-shuffle the labels

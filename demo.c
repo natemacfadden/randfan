@@ -10,6 +10,8 @@
 // this is a demo of randfan.h
 
 int main(int argc, char **argv) {
+    (void)argc;
+
     // parse input vectors
     // -------------------
     // in row order. Ideally format "[[p0,p1,...],[q0,q1,..],...]"
@@ -50,7 +52,7 @@ int main(int argc, char **argv) {
     // (just call randfan)
     int max_num_simps = 1000;
     uint32_t* simps   = malloc(max_num_simps * sizeof(uint32_t));
-    uint32_t num_simps;
+    int num_simps;
 
     uint64_t seed = 1102;
     int retval = randfan(
