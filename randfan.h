@@ -35,13 +35,13 @@ A status code according to following list:
     FILL IN
 */
 int randfan(
-    int * vecs,
+    int *vecs,
     int dim,
     int num_vecs,
     int max_num_simps,
     uint64_t seed,
-    uint32_t * simps,
-    uint32_t * num_simps
+    uint32_t *simps,
+    uint32_t *num_simps
 );
 
 
@@ -303,16 +303,49 @@ void hrep(int *R, int dim, int *H) {
     }
 }
 
+int simp_contains(Simplex *simp, int *vecs, int dim, int *labels, int num_labels) {
+    // check if the simplex `simp` contains any of the vectors in `labels`
+    for (int ilabel=0; ilabel<num_labels; ++ilabel){
+        int label = labels[ilabel];
+
+        // nice check: skip if label is explicitly in simp
+        int skip = 0;
+        for (int isimp=0; isimp<dim; ++isimp) {
+            if (label == (int)simp->labels[isimp]) {skip = 1; break;}
+        }
+        if (skip == 1) continue;
+
+        // check if label is in conical hull
+        int bad = 1;
+        int dot;
+        for (int ifacet=0; ifacet<dim; ++ifacet) {
+            dot = 0;
+            for (int k=0; k<dim; ++k) {
+                dot += simp->normals[MAX_DIM* ifacet+k] * vecs[dim* label+k];
+            }
+            bad = bad && (dot>=0);
+        }
+
+        // label *is* in conical hull :(
+        if (bad) {
+            return 1;
+        }
+    }
+
+    // no label was in conical hull :)
+    return 0;
+}
+
 // RANDFAN BEGINS
 // ==============
 int randfan(
-    int * vecs,
+    int *vecs,
     int dim,
     int num_vecs,
     int max_num_simps,
     uint64_t seed,
-    uint32_t * simps,
-    uint32_t * num_simps)
+    uint32_t *simps,
+    uint32_t *num_simps)
 {
     /*
     **Description:**
@@ -393,44 +426,8 @@ int randfan(
         }
         hrep(seed_simp_R, dim, seed_simp_H);
 
-        // check if any other vector is included in this cone
-        // --------------------------------------------------
-        for (int label=0; label<num_vecs; ++label){
-            // next iter if this label corresponds to one explicitly in the simp
-            int skip = 0;
-            for (int isimp=0; isimp<dim; ++isimp) {
-                if (label == (int)simp_labels[isimp]) {skip = 1; break;}
-            }
-            if (skip == 1) continue;
-
-            // label isn't explicitly in simp - check if it's in conical hull
-            int bad = 1;
-            for (int ifacet=0; ifacet<dim; ++ifacet) {
-                int dot = 0;
-                for (int k=0; k<dim; ++k)
-                    dot += seed_simp_H[dim* ifacet+k] * vecs[dim* label+k];
-                bad = bad && (dot>=0);
-            }
-
-            // label *is* in conical hull :( update _inds and retry
-            if (bad == 1){
-                // increment the indices corresponding to the simplex
-                for (int i=0; i<dim-1; ++i) {
-                    if (_inds[i]+1 < _inds[i+1]) {
-                        _inds[i] += 1;
-                        goto begin_loop; // retry!
-                    }
-                }
-
-                // no hits for i<dim-1... must set i=dim-1
-                for (int i=0; i<dim-1; ++i) _inds[i] = i;
-                _inds[dim-1] += 1;
-                goto begin_loop; // retry!
-            }
-        }
-
-        // no bad vectors!
-        // save as formal simplex
+        // write as formal simplex
+        // -----------------------
         Simplex *simp = &_simps[0];
 
         for (int i=0; i<dim; ++i) {
@@ -440,24 +437,31 @@ int randfan(
             for (int j=0; j<dim; ++j)
                 simp->normals[MAX_DIM* i+j] = seed_simp_H[dim* i+j];
         }
-        simp->num_external_facets = dim;
 
-        printf(":)\n");
+        // check if any other vector is included in this cone
+        // --------------------------------------------------
+        int cont = simp_contains(simp, vecs, dim, labels, num_vecs);
+        
+        if (cont) {
+            // increment the indices corresponding to the simplex
+            for (int i=0; i<dim-1; ++i) {
+                if (_inds[i]+1 < _inds[i+1]) {
+                    _inds[i] += 1;
+                    goto begin_loop; // retry!
+                }
+            }
 
-        printf("%d\n",*num_simps);
-
-        printf("labels = ");
-        for (int i=0; i<dim; ++i)
-            printf("%d,",_simps[0].labels[i]);
-        printf("\n");
-
-        printf("external_facet_inds = ");
-        for (int i=0; i<dim; ++i)
-            printf("%d,",_simps[0].external_facet_inds[i]);
-        printf("\n");
+            // no hits for i<dim-1... must set i=dim-1
+            for (int i=0; i<dim-1; ++i) _inds[i] = i;
+            _inds[dim-1] += 1;
+            goto begin_loop; // retry!
+        }
 
         break;
     }
+
+    // build other simplices
+    // ----------------------
 
     end:
         free(_simps);
