@@ -215,12 +215,26 @@ void insertion_sort(int *arr, int len) {
 typedef struct {
     int labels[MAX_DIM];              // vertices of the simplex
     int normals[MAX_DIM*MAX_DIM];     // inwards-facing normals
-    int external_facet_inds[MAX_DIM]; // indices of external facets
+    int external_facet_inds[MAX_DIM]; // indices of external facets... unsorted
     int num_external_facets;
 } Simplex;
 
-// H-REP OF N-1 SIMPLEX
-// --------------------
+// MISC CUSTOM HELPERS
+// -------------------
+int gcd(int a, int b) {
+    a = abs(a); b = abs(b);
+    while (b) { int t = b; b = a % b; a = t; }
+    return a;
+}
+
+void reduce_by_gcd(int *v, int dim) {
+    // reduces a vector by its gcd
+    int g = 0;
+    for (int i = 0; i < dim; i++) g = gcd(g, v[i]);
+    if (g <= 1) return;
+    for (int i = 0; i < dim; i++) v[i] /= g;
+}
+
 int det(int *M, int dim) {
     // computes the determinant of M, a dim-by-dim matrix
 
@@ -251,6 +265,15 @@ int det(int *M, int dim) {
     return out;
 }
 
+int dot(int *a, int *b, int dim) {
+    int out = 0;
+    for (int i=0; i<dim; ++i)
+        out += a[i]*b[i];
+    return out;
+}
+
+// H-REP OF N-1 SIMPLEX
+// --------------------
 void simp_facet_normal(int *R, int dim, int *x) {
     // for R the (row-wise) rays of a facet of a simplex, compute the normal x
     // i.e., the vector x such that Rx=0.
@@ -273,13 +296,9 @@ void simp_facet_normal(int *R, int dim, int *x) {
         // set x[i]
         x[xi] = sign*det(R_trim,dim-1);
     }
-}
 
-int dot(int *a, int *b, int dim) {
-    int out = 0;
-    for (int i=0; i<dim; ++i)
-        out += a[i]*b[i];
-    return out;
+    // reduce normal by GCD...
+    reduce_by_gcd(x, dim);
 }
 
 void hrep(int *R, int dim, int *H) {
@@ -394,15 +413,17 @@ int randfan(
     for (int i = 0; i < num_vecs; i++) { labels[i] = i; }
 
     // simplex variables
-    int _inds[dim]; // indices into the shuffled labels... defines simplex
+    int _inds[dim]; // indices into the (shuffled) labels... defines simplex
     int simp_labels[dim];
-    int seed_simp_R[dim*dim];
+    int seed_simp_V[dim*dim];
     int seed_simp_H[dim*dim];
 
     // fan variables
-    Simplex *_simps      = NULL;
+    Simplex *_simps     = NULL;
+    int visible_numfacets;
     int *visible_isimp  = NULL;
-    int *visible_ifacet = NULL; 
+    int *visible_ifacet = NULL;
+    int covered_vec; 
 
     // initialize the fan variables
     *num_simps      = 0;
@@ -445,13 +466,13 @@ int randfan(
             printf("], ");
         #endif
 
-        // get the H-representation
+        // get the V and H-representations
         for (int i=0; i<dim; ++i) {
             for (int j=0; j<dim; ++j) {
-                seed_simp_R[dim* i+j] = vecs[dim* simp_labels[i]+j];
+                seed_simp_V[dim* i+j] = vecs[dim* simp_labels[i]+j];
             }
         }
-        hrep(seed_simp_R, dim, seed_simp_H);
+        hrep(seed_simp_V, dim, seed_simp_H);
 
         // write as formal simplex
         // -----------------------
@@ -468,9 +489,7 @@ int randfan(
 
         // check if any other vector is included in this cone
         // --------------------------------------------------
-        int cont = simp_contains(simp, vecs, dim, labels, num_vecs);
-        
-        if (cont) {
+        if (simp_contains(simp, vecs, dim, labels, num_vecs)) {
             // increment the indices corresponding to the simplex
             // iterate over _inds right-to-left, trying to increment each val
             int i = dim - 1;
@@ -515,28 +534,33 @@ int randfan(
 
     // build other simplices
     // ---------------------
-    int visible_numfacets;
     visible_isimp  = malloc(max_num_simps * dim * sizeof(int));
     visible_ifacet = malloc(max_num_simps * dim * sizeof(int));
-    if (visible_isimp == NULL) { return_code = -1; goto end; }
+    if (visible_isimp == NULL)  { return_code = -1; goto end; }
     if (visible_ifacet == NULL) { return_code = -1; goto end; }
 
     while (num_labels > 0) {
-        // re-shuffle the labels
+        // re-shuffle the (now trimmed) labels
         fisher_yates(labels, num_labels, s);
 
-        // try pushing each label
+        printf("--------------------\n");
+
+        // try pushing each label until one works (doesn't cover another vector)
         for (int ilabel=0; ilabel<num_labels; ++ilabel) {
             visible_numfacets = 0;
             int label = labels[ilabel];
 
-            // get geometric vector
+            printf("%d %d %d...\n", *num_simps, num_labels, label);
+
+            // get geometric vector associated to the label
             int v[dim];
             for (int i=0; i<dim; ++i) v[i] = vecs[dim* label+i];
 
             // compute visible facets
             // ----------------------
             for (int isimp=0; isimp<*num_simps; ++isimp) {
+                // does the isimp-th simplex have a visible facet?
+                // (need dot(v, normal)<0)
                 Simplex *simp = &_simps[isimp];
 
                 for (int ifacet=0; ifacet<simp->num_external_facets; ++ifacet) {
@@ -557,9 +581,15 @@ int randfan(
             // --------------------------------------------------
             // (don't update num_simps yet in case any of these are bad)
             for (int k=0; k<visible_numfacets; ++k) {
-                // store simplex at index *num_simps +k
-                // i.e., store after the 'recorded' length
+                Simplex facet_haver = _simps[visible_isimp[k]];
+
+                // store simplex at index (*num_simps + k)
+                // i.e., store k+1 indices after the 'recorded' length
                 Simplex *simp = &_simps[*num_simps+k];
+                covered_vec   = 0;
+
+                // make the simplex
+                // ----------------
                 simp->labels[0] = label;
 
                 // collect the labels from the external facet
@@ -567,47 +597,105 @@ int randfan(
                 for (int i=0; i<dim; ++i) {
                     // ith facet corresponds to deleting ith point
                     skipped = skipped || (i==visible_ifacet[k]);
-                    if (i==visible_ifacet[k]) continue; // deleted point
-                    simp->labels[(i-skipped)+1] = _simps[visible_isimp[k]].labels[i];
+                    if (i==visible_ifacet[k]) {
+                        continue; // deleted point
+                    }
+
+                    simp->labels[(i-skipped)+1] = facet_haver.labels[i];
                 }
 
-                // save the normal for the 0th facet (which deletes new point)
-                //for (int j=0; j<dim; ++j)
-                //    simp->normals[j] = FOO;//seed_simp_H[dim* i+j];
+                // get the rays/hyperplanes to check for covering other vecs
+                for (int i=0; i<dim; ++i) {
+                    for (int j=0; j<dim; ++j) {
+                        seed_simp_V[dim* i+j] = vecs[dim* simp->labels[i]+j];
+                    }
+                }
+                hrep(seed_simp_V, dim, seed_simp_H);
+
+                for (int i=0; i<dim; ++i) {
+                    for (int j=0; j<dim; ++j)
+                        simp->normals[MAX_DIM* i+j] = seed_simp_H[dim* i+j];
+                }
 
                 // all but 0th facet (which deletes new point) are external
                 for (int i=1; i<dim; ++i) {
                     simp->external_facet_inds[i-1] = i;
-                    //for (int j=0; j<dim; ++j)
-                    //    simp->normals[MAX_DIM* i+j] = FOO;//seed_simp_H[dim* i+j];
-                    simp->num_external_facets = dim-1;
+                }
+                simp->num_external_facets = dim-1;
+
+                // check if there is a bad containment
+                // -----------------------------------
+                if (simp_contains(simp, vecs, dim, labels, num_vecs)) {
+                    covered_vec = 1;
+                    break;
+                }
+            }
+            // try next label if one of the simplices covered another vec
+            if (covered_vec) {
+                continue;
+            }
+
+            // not bad :)
+            // ----------
+            // update external facets...
+            // first, remove the visible facets from being external
+            for (int k=0; k<visible_numfacets; ++k) {
+                Simplex facet_haver = _simps[visible_isimp[k]];
+                for (int i=0; i<facet_haver.num_external_facets; ++i) {
+                    if (i==visible_ifacet[k]) {
+                        facet_haver.external_facet_inds[i] = facet_haver.external_facet_inds[facet_haver.num_external_facets-1];
+                        facet_haver.num_external_facets--;
+                        break;
+                    }
+                }
+            }
+            // now, remove any new facets that are included in 2x new simps
+            for (int i=0; i<visible_numfacets-1; ++i) {
+                Simplex *simpA = &_simps[*num_simps + i];
+
+                for (int j=i+1; j<visible_numfacets; ++j) {
+                    Simplex *simpB = &_simps[*num_simps + j];
+
+                    // check if they define a shared facet
+                    // since normals are normalized, this occurs iff they have
+                    // normals with opposite signs
+                    for (int ifacet=0; ifacet<simpA->num_external_facets; ++ifacet) {
+                        for (int jfacet=0; jfacet<simpB->num_external_facets; ++jfacet) {
+                            int shared = 1;
+
+                            for (int k=0; k<dim; ++k) {
+                                int nA_k = simpA->normals[MAX_DIM* simpA->external_facet_inds[ifacet] + k];
+                                int nB_k = simpB->normals[MAX_DIM* simpB->external_facet_inds[jfacet] + k];
+                                if (nA_k != -nB_k) {
+                                    shared = 0;
+                                    break;
+                                }
+                            }
+                            if (shared) {
+                                simpA->external_facet_inds[ifacet] = simpA->external_facet_inds[simpA->num_external_facets-1];
+                                simpB->external_facet_inds[ifacet] = simpB->external_facet_inds[simpB->num_external_facets-1];
+                                simpA->num_external_facets--;
+                                simpB->num_external_facets--;
+                                goto next_iter;
+                            }
+                        }
+                    }
+
+                    next_iter:;
                 }
             }
 
-            // DEBUG
-            printf("\n");
-            printf("isimp ");
-            for (int i=0; i<visible_numfacets; ++i) {
-                printf("%d,",visible_isimp[i]);
+            // update num_simps, labels
+            (*num_simps)++;
+
+            for (int i=0; i<num_labels; ++i) {
+                // check if we need to throw away the ith label
+                if (labels[i] == label) {
+                    labels[i] = labels[num_labels-1];
+                    num_labels--;
+                    break;
+                }
             }
-            printf("\n");
-            printf("ifacet ");
-            for (int i=0; i<visible_numfacets; ++i) {
-                printf("%d,",visible_ifacet[i]);
-            }
-            printf("\n");
-
-            goto end;
-            /*
-            for simp in simps:
-                for i in range(num_external_facets):
-                    n = simp.facets[i]
-            */
-
-            // CHECK IF SIMPLEX cup labels[ilabel] CONTAINS ANYONE ELSE
-
-            // IF YES, TRY NEXT ilabel
-            // IF NO, ADD THESE SIMPLICES
         }
     }
 
