@@ -383,6 +383,11 @@ int randfan(
         -2: couldn't find initial simplex
         FILL IN
     */
+    // malloc variables (so we can free them all later safely)
+    Simplex *_simps      = NULL;
+    int *external_isimp  = NULL;
+    int *external_ifacet = NULL; 
+
     // set up some variables
     // ---------------------
     int return_code = 0;
@@ -391,7 +396,7 @@ int randfan(
     for (int i = 0; i < num_vecs; i++) labels[i] = i;
 
     *num_simps      = 0;
-    Simplex *_simps = malloc(max_num_simps * sizeof(Simplex)); // internal use
+    _simps = malloc(max_num_simps * sizeof(Simplex)); // internal use
     if (_simps == NULL) { return_code = -1; goto end; }
 
     // seed the RNG
@@ -502,8 +507,8 @@ int randfan(
     // build other simplices
     // ---------------------
     int external_numfacets;
-    int *external_isimp  = malloc(max_num_simps * dim * sizeof(int));
-    int *external_ifacet = malloc(max_num_simps * dim * sizeof(int));
+    external_isimp  = malloc(max_num_simps * dim * sizeof(int));
+    external_ifacet = malloc(max_num_simps * dim * sizeof(int));
     if (external_isimp == NULL) { return_code = -1; goto end; }
     if (external_ifacet == NULL) { return_code = -1; goto end; }
 
