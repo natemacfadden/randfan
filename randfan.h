@@ -1,7 +1,7 @@
 #ifndef RANDFAN_H
 #define RANDFAN_H
 
-#define DEBUG
+//#define DEBUG
 
 // copying could be reduced significantly in this code...
 

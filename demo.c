@@ -7,11 +7,12 @@
 #include <string.h>
 #include <stdint.h>
 
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+
 // this is a demo of randfan.h
 
 int main(int argc, char **argv) {
-    (void)argc;
-
     // parse input vectors
     // -------------------
     // in row order. Ideally format "[[p0,p1,...],[q0,q1,..],...]"
@@ -54,20 +55,35 @@ int main(int argc, char **argv) {
     uint32_t* simps   = malloc(max_num_simps * sizeof(uint32_t));
     int num_simps;
 
-    uint64_t seed = 1102;
-    int retval = randfan(
-        vecs, dim, num_vecs,
-        max_num_simps, seed,
-        simps, &num_simps);
 
-    for (int i=0; i<num_simps; ++i) {
-        printf("[");
-        for (int j=0; j<dim; ++j) {
-            printf("%d,", simps[dim* i+j]);
+    int num_seeds = MAX(1, argc-2);
+    uint64_t seeds[num_seeds];
+    if (argc==2) {
+        uint64_t seeds[1];
+        seeds[0] = 1102;
+    } else {
+        for (int i=0; i<argc-2; ++i) {
+            seeds[i] = atoi(argv[2+i]);
         }
-        printf("],");
     }
-    printf("\n");
+
+    for (int iseed=0; iseed<num_seeds; ++iseed) {
+        uint64_t seed = seeds[iseed];
+
+        int retval = randfan(
+            vecs, dim, num_vecs,
+            max_num_simps, seed,
+            simps, &num_simps);
+
+        for (int i=0; i<num_simps; ++i) {
+            printf("[");
+            for (int j=0; j<dim; ++j) {
+                printf("%d,", simps[dim* i+j]);
+            }
+            printf("],");
+        }
+        printf("\n\n");
+    }
 
 
     // free data
