@@ -1,6 +1,7 @@
 # custom
-*.dat
 scratch/
+*.dat
+*.png
 
 
 # Prerequisites
