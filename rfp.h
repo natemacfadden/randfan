@@ -1,6 +1,7 @@
-#ifndef RANDFAN_H
-#define RANDFAN_H
+#ifndef RFP_H
+#define RFP_H
 
+//#define VERBOSE
 //#define DEBUG
 
 // copying could be reduced significantly in this code...
@@ -37,7 +38,7 @@ A status code according to following list:
     -2: couldn't find seed simplex
     FILL IN
 */
-int randfan(
+int rfp(
     int *vecs,
     int dim,
     int num_vecs,
@@ -50,7 +51,7 @@ int randfan(
 
 // IMPLEMENTATION
 // ==============
-#ifdef RANDFAN_IMPLEMENTATION
+#ifdef RFP_IMPLEMENTATION
 
 #ifndef MAX_DIM
 #define MAX_DIM 8
@@ -96,7 +97,7 @@ static inline uint64_t rotl(const uint64_t x, int k) {
 }
 
 
-//static uint64_t s[4]; -- removed for parallelism concerns in randfan
+//static uint64_t s[4]; -- removed for parallelism concerns in rfp
 // (all methods below will have `void` argument changed to uint64_t s[4])
 
 uint64_t next(uint64_t s[4]) {
@@ -122,7 +123,12 @@ uint64_t next(uint64_t s[4]) {
    non-overlapping subsequences for parallel computations. */
 
 void jump(uint64_t s[4]) {
-    static const uint64_t JUMP[] = { 0x180ec6d33cfd0aba, 0xd5a61266f0c9392c, 0xa9582618e03fc9aa, 0x39abdc4529b1661c };
+    static const uint64_t JUMP[] = {
+        0x180ec6d33cfd0aba,
+        0xd5a61266f0c9392c,
+        0xa9582618e03fc9aa,
+        0x39abdc4529b1661c
+    };
 
     uint64_t s0 = 0;
     uint64_t s1 = 0;
@@ -153,7 +159,12 @@ void jump(uint64_t s[4]) {
    subsequences for parallel distributed computations. */
 
 void long_jump(uint64_t s[4]) {
-    static const uint64_t LONG_JUMP[] = { 0x76e15d3efefdcbbf, 0xc5004e441c522fb3, 0x77710069854ee241, 0x39109bb02acbe635 };
+    static const uint64_t LONG_JUMP[] = {
+        0x76e15d3efefdcbbf,
+        0xc5004e441c522fb3,
+        0x77710069854ee241,
+        0x39109bb02acbe635
+    };
 
     uint64_t s0 = 0;
     uint64_t s1 = 0;
@@ -330,7 +341,12 @@ void hrep(int *R, int dim, int *H) {
     }
 }
 
-int simp_contains(Simplex *simp, int *vecs, int dim, int *labels, int num_labels) {
+int simp_contains(
+    Simplex *simp,
+    int *vecs,
+    int dim,
+    int *labels,
+    int num_labels) {
     // check if the simplex `simp` contains any of the vectors in `labels`
     // returns a label contained. If no label is contained, returns 01
 
@@ -366,9 +382,9 @@ int simp_contains(Simplex *simp, int *vecs, int dim, int *labels, int num_labels
     return -1;
 }
 
-// RANDFAN BEGINS
+// RFP BEGINS
 // ==============
-int randfan(
+int rfp(
     int *vecs,
     int dim,
     int num_vecs,
@@ -449,7 +465,7 @@ int randfan(
     for (int i=0; i<dim; ++i) _inds[i] = i;
 
     // DEBUG PRINT
-    #ifdef DEBUG
+    #if defined(DEBUG) || defined(VERBOSE)
         fprintf(stderr,"Constructing initial simplex...");
     #endif
 
@@ -462,7 +478,7 @@ int randfan(
         insertion_sort(simp_labels, dim);
 
         // DEBUG PRINT
-        #ifdef DEBUG
+        #if defined(DEBUG) || defined(VERBOSE)
             fprintf(stderr,"[");
             for (int i=0; i<dim; ++i)
                 fprintf(stderr,"%d,",simp_labels[i]);
@@ -477,7 +493,29 @@ int randfan(
         }
 
         // check determinant
-        if (det(seed_simp_V, dim) == 0) { goto increment_inds; }
+        if (det(seed_simp_V, dim) == 0) {
+            increment_inds:;
+
+            // increment the indices corresponding to the simplex
+            // iterate over _inds right-to-left, trying to increment each val
+            int i = dim - 1;
+            while (i >= 0 && _inds[i] >= num_vecs - dim + i) {
+                // (second condition sees if we can update _inds[j] for j>i)
+                i--;
+            }
+
+            // exhausted all combinations... error
+            // (shouldn't ever hit though)
+            if (i < 0) { return_code=-2; goto end; }
+
+            // update the index i
+            _inds[i]++;
+
+            // update the indices j>i
+            for (int j = i + 1; j < dim; j++)
+                _inds[j] = _inds[i] + (j - i);
+            goto begin_seed;
+        }
 
         // get H-representation
         hrep(seed_simp_V, dim, seed_simp_H);
@@ -498,27 +536,42 @@ int randfan(
         // check if any other vector is included in this cone
         // --------------------------------------------------
         int cont_label = simp_contains(simp, vecs, dim, labels, num_vecs);
+        int cont_ind;
         if (cont_label != -1) {
-            increment_inds:
-            // increment the indices corresponding to the simplex
-            // iterate over _inds right-to-left, trying to increment each val
-            int i = dim - 1;
-            while (i >= 0 && _inds[i] >= num_vecs - dim + i) {
-                // (second condition sees if we can update _inds[j] for j>i)
-                i--;
+            // darn... another vector is in cone... subdivide until we're good
+
+            // get cone index
+            for (int i=0; i<num_vecs; ++i) {
+                if (cont_label == labels[i]) {
+                    cont_ind = i;
+                    break;
+                }
             }
 
-            // exhausted all combinations... error
-            // (shouldn't ever hit though)
-            if (i < 0) { return_code=-2; goto end; }
+            // try replacing ith point with cone_in
+            int new_inds[dim];
+            for (int i=0; i<dim; ++i) { new_inds[i] = _inds[i]; }
 
-            // update the index i
-            _inds[i]++;
+            for (int i=0; i<dim; ++i) {
+                // try replacing the point i with the interior point
+                int tmp  = _inds[i];
+                _inds[i] = cont_ind;
 
-            // update the indices j>i
-            for (int j = i + 1; j < dim; j++)
-                _inds[j] = _inds[i] + (j - i);
-            goto begin_seed;
+                // get the V-representation
+                for (int i=0; i<dim; ++i) {
+                    for (int j=0; j<dim; ++j) {
+                        seed_simp_V[dim* i+j] = vecs[dim* labels[_inds[i]]+j];
+                    }
+                }
+
+                // check determinant
+                if (det(seed_simp_V, dim) != 0) { goto begin_seed; }
+
+                _inds[i] = tmp;
+            }
+            // this line should never be hit
+            printf("This line should never be hit...\n");
+            goto increment_inds;
         }
 
         break;
@@ -541,7 +594,7 @@ int randfan(
     // update simp count
     (*num_simps)++;
 
-    #ifdef DEBUG
+    #if defined(DEBUG) || defined(VERBOSE)
         fprintf(stderr,"\nDone!\n");
     #endif
 
@@ -553,6 +606,11 @@ int randfan(
     if (visible_ifacet == NULL) { return_code = -1; goto end; }
 
     int last_num_labels = num_labels+1;
+    #if defined(DEBUG) || defined(VERBOSE)
+    fprintf(stderr, "\n");
+    fprintf(stderr, "#remaining labels | #simps\n");
+    fprintf(stderr, "--------------------------\n");
+    #endif
     while (num_labels > 0) {
         // ensure we're making progress
         if (last_num_labels <= num_labels) {
@@ -565,21 +623,14 @@ int randfan(
         // re-shuffle the (now trimmed) labels
         fisher_yates(labels, num_labels, s);
 
-        #ifdef DEBUG
-        fprintf(stderr, "\n%d | %d\n", num_labels, num_simps);
-        fprintf(stderr, "--------------------\n");
+        #if defined(DEBUG) || defined(VERBOSE)
+        fprintf(stderr, "%d | %d\n", num_labels, *num_simps);
         #endif
 
         // try pushing each label until one works (doesn't cover another vector)
         for (int ilabel=0; ilabel<num_labels; ++ilabel) {
             visible_numfacets = 0;
             int label = labels[ilabel];
-
-            /*
-            #ifdef DEBUG
-            fprintf(stderr,"trying to add label=%d (#simps=%d; #outstanding labels=%d)...\n", label, *num_simps, num_labels);
-            #endif
-            */
 
             // get geometric vector associated to the label
             int v[dim];
