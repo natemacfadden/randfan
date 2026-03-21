@@ -37,7 +37,6 @@ A status code according to following list:
     -1: memory allocation problem
     -2: 0 vector input
     -3: couldn't find initial simplex
-    FILL IN
 */
 int rfp(
     int *vecs,
@@ -420,7 +419,7 @@ int rfp(
         -1: memory allocation problem
         -2: 0 vector input
         -3: couldn't find initial simplex
-        FILL IN
+        -4: too many simplices
     */
     // set up some variables
     // ---------------------
@@ -582,19 +581,16 @@ int rfp(
                 }
             }
 
-            // try replacing ith point with cone_in
-            int new_inds[dim];
-            for (int i=0; i<dim; ++i) { new_inds[i] = _inds[i]; }
-
+            // try replacing ith point with cont_ind
             for (int i=0; i<dim; ++i) {
                 // try replacing the point i with the interior point
                 int tmp  = _inds[i];
                 _inds[i] = cont_ind;
 
                 // get the V-representation
-                for (int i=0; i<dim; ++i) {
-                    for (int j=0; j<dim; ++j) {
-                        seed_simp_V[dim* i+j] = vecs[dim* labels[_inds[i]]+j];
+                for (int j=0; j<dim; ++j) {
+                    for (int k=0; k<dim; ++k) {
+                        seed_simp_V[dim* j+k] = vecs[dim* labels[_inds[j]]+k];
                     }
                 }
 
@@ -648,7 +644,10 @@ int rfp(
     while (num_labels > 0) {
         // ensure we're making progress
         if (last_num_labels <= num_labels) {
+            #ifdef VERBOSE
             printf("Didn't make progress in last iteration... %d %d\n",last_num_labels,num_labels);
+            #endif
+
             return_code = -3;
             goto end;
         }
@@ -689,6 +688,11 @@ int rfp(
                         visible_numfacets++;
                     }
                 }
+            }
+
+            if (*num_simps + visible_numfacets > max_num_simps) {
+                return_code = -4;
+                goto end;
             }
 
             // tentatively add simps associated to visible facets
