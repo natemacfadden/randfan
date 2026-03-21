@@ -792,41 +792,56 @@ int rfp(
                     }
                 }
             }
+
             // now, remove any new facets that are included in 2x new simps
+            // (don't compare normals since diff dim-1 cones can be coplanar)
             for (int i=0; i<visible_numfacets; ++i) {
                 Simplex *simpA = &_simps[*num_simps + i];
 
-                for (int j=i; j<visible_numfacets; ++j) {
-                    // start at j=i since the same simplex can have multiple visible facets
+                for (int j=i+1; j<visible_numfacets; ++j) {
                     Simplex *simpB = &_simps[*num_simps + j];
 
-                    // check if they define a shared facet
-                    // since normals are normalized, this occurs iff they have
-                    // normals with opposite signs
-                    for (int ifacet=0; ifacet<simpA->num_external_facets; ++ifacet) {
-                        for (int jfacet=0; jfacet<simpB->num_external_facets; ++jfacet) {
-                            int shared = 1;
-
-                            for (int k=0; k<dim; ++k) {
-                                int nA_k = simpA->normals[MAX_DIM* simpA->external_facet_inds[ifacet] + k];
-                                int nB_k = simpB->normals[MAX_DIM* simpB->external_facet_inds[jfacet] + k];
-                                if (nA_k != -nB_k) {
-                                    shared = 0;
-                                    break;
-                                }
-                            }
-                            if (shared) {
-                                simpA->external_facet_inds[ifacet] = simpA->external_facet_inds[simpA->num_external_facets-1];
-                                simpA->num_external_facets--;
-
-                                simpB->external_facet_inds[jfacet] = simpB->external_facet_inds[simpB->num_external_facets-1];
-                                simpB->num_external_facets--;
-                                goto next_iter;
-                            }
+                    // count shared vertices; track the unique vertex index
+                    int shared_count = 0;
+                    int a_unique = -1; // index in simpA of vertex not in simpB
+                    int b_unique = -1; // index in simpB of vertex not in simpA
+                    for (int ka=0; ka<dim; ++ka) {
+                        int found = 0;
+                        for (int kb=0; kb<dim; ++kb) {
+                            if (simpA->labels[ka] == simpB->labels[kb]) {
+                                found = 1;
+                                break; }
                         }
+                        if (found)
+                            shared_count++;
+                        else
+                            a_unique = ka;
+                    }
+                    if (shared_count != dim-1) continue; // not a shared facet
+                    for (int kb=0; kb<dim; ++kb) {
+                        int found = 0;
+                        for (int ka=0; ka<dim; ++ka) {
+                            if (simpB->labels[kb] == simpA->labels[ka]) { found = 1; break; }
+                        }
+                        if (!found) { b_unique = kb; break; }
                     }
 
-                    next_iter:;
+                    // remove facets a_unique and b_unique from simpA, simpB
+                    for (int ifacet=0; ifacet<simpA->num_external_facets; ++ifacet) {
+                        if (simpA->external_facet_inds[ifacet] == a_unique) {
+                            simpA->external_facet_inds[ifacet] = simpA->external_facet_inds[simpA->num_external_facets-1];
+                            simpA->num_external_facets--;
+                            break;
+                        }
+                    }
+                    // remove b_unique from simpB's external facets
+                    for (int ifacet=0; ifacet<simpB->num_external_facets; ++ifacet) {
+                        if (simpB->external_facet_inds[ifacet] == b_unique) {
+                            simpB->external_facet_inds[ifacet] = simpB->external_facet_inds[simpB->num_external_facets-1];
+                            simpB->num_external_facets--;
+                            break;
+                        }
+                    }
                 }
             }
 
