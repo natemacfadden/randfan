@@ -37,7 +37,7 @@ A status code according to following list:
     -1: memory allocation problem
     -2: 0 vector input
     -3: couldn't find initial simplex
-    -100: no idea lol
+    -100: error in splitting a cone - see code
 */
 int rfp(
     int *vecs,
@@ -251,6 +251,8 @@ static int det(int *M, int dim) {
     // computes the determinant of M, a dim-by-dim matrix
 
     // base case
+    if (dim == 1)
+        return M[0];
     if (dim == 2)
         return M[2* 0+0]*M[2* 1+1] - M[2* 1+0]*M[2* 0+1];
 
@@ -349,7 +351,7 @@ static int simp_contains(
     int *labels,
     int num_labels) {
     // check if the simplex `simp` contains any of the vectors in `labels`
-    // returns a label contained. If no label is contained, returns 01
+    // returns a label contained. If no label is contained, returns -1
 
     for (int ilabel=0; ilabel<num_labels; ++ilabel){
         int label = labels[ilabel];
@@ -421,7 +423,7 @@ int rfp(
         -2: 0 vector input
         -3: couldn't find initial simplex
         -4: too many simplices
-        -100: no idea lol
+        -100: error in splitting a cone - see code
     */
     // set up some variables
     // ---------------------
@@ -478,7 +480,7 @@ int rfp(
         #endif
 
         if (bad) {
-            printf("Rejected since the 0-vector was input...\n");
+            fprintf(stderr, "Rejected since the 0-vector was input...\n");
             return_code = -2;
             goto end;
         }
@@ -602,7 +604,9 @@ int rfp(
                 _inds[i] = tmp;
             }
             // this line should never be hit
-            printf("This line should never be hit...\n");
+            fprintf(stderr, "Cone contained label %d but ", cont_label);
+            fprintf(stderr, "couldn't replace any of its vertices while ");
+            fprintf(stderr, "staying full-dim. Deeper error exists");
             return_code = -100;
             goto end;
         }
@@ -771,23 +775,23 @@ int rfp(
             // ----------
             // update external facets...
             // first, remove the visible facets from being external
-              for (int k=0; k<visible_numfacets; ++k) {
-                  Simplex *facet_haver = &_simps[visible_isimp[k]];
-                  int ifacet  = visible_ifacet[k];
-                  int last_idx = facet_haver->num_external_facets - 1;
+            for (int k=0; k<visible_numfacets; ++k) {
+                Simplex *facet_haver = &_simps[visible_isimp[k]];
+                int ifacet  = visible_ifacet[k];
+                int last_idx = facet_haver->num_external_facets - 1;
 
-                  // swap-with-last removal
-                  facet_haver->external_facet_inds[ifacet] = facet_haver->external_facet_inds[last_idx];
-                  facet_haver->num_external_facets--;
+                // swap-with-last removal
+                facet_haver->external_facet_inds[ifacet] = facet_haver->external_facet_inds[last_idx];
+                facet_haver->num_external_facets--;
 
-                  // fix up any later entries that pointed to last_idx on the same simplex
-                  for (int k2 = k+1; k2 < visible_numfacets; ++k2) {
-                      if (visible_isimp[k2] == visible_isimp[k] && visible_ifacet[k2] == last_idx) {
-                          visible_ifacet[k2] = ifacet;
-                          // (at most one such k2 exists per k)
-                      }
-                  }
-              }
+                // fix up any later entries that pointed to last_idx on the same simplex
+                for (int k2 = k+1; k2 < visible_numfacets; ++k2) {
+                    if (visible_isimp[k2] == visible_isimp[k] && visible_ifacet[k2] == last_idx) {
+                        visible_ifacet[k2] = ifacet;
+                        // (at most one such k2 exists per k)
+                    }
+                }
+            }
             // now, remove any new facets that are included in 2x new simps
             for (int i=0; i<visible_numfacets; ++i) {
                 Simplex *simpA = &_simps[*num_simps + i];
