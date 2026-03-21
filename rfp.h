@@ -37,6 +37,7 @@ A status code according to following list:
     -1: memory allocation problem
     -2: 0 vector input
     -3: couldn't find initial simplex
+    -100: no idea lol
 */
 int rfp(
     int *vecs,
@@ -232,13 +233,13 @@ typedef struct {
 
 // MISC CUSTOM HELPERS
 // -------------------
-int gcd(int a, int b) {
+static int gcd(int a, int b) {
     a = abs(a); b = abs(b);
     while (b) { int t = b; b = a % b; a = t; }
     return a;
 }
 
-void reduce_by_gcd(int *v, int dim) {
+static void reduce_by_gcd(int *v, int dim) {
     // reduces a vector by its gcd
     int g = 0;
     for (int i = 0; i < dim; i++) g = gcd(g, v[i]);
@@ -246,7 +247,7 @@ void reduce_by_gcd(int *v, int dim) {
     for (int i = 0; i < dim; i++) v[i] /= g;
 }
 
-int det(int *M, int dim) {
+static int det(int *M, int dim) {
     // computes the determinant of M, a dim-by-dim matrix
 
     // base case
@@ -276,7 +277,7 @@ int det(int *M, int dim) {
     return out;
 }
 
-int dot(int *a, int *b, int dim) {
+static int dot(int *a, int *b, int dim) {
     int out = 0;
     for (int i=0; i<dim; ++i)
         out += a[i]*b[i];
@@ -285,7 +286,7 @@ int dot(int *a, int *b, int dim) {
 
 // H-REP OF N-1 SIMPLEX
 // --------------------
-void simp_facet_normal(int *R, int dim, int *x) {
+static void simp_facet_normal(int *R, int dim, int *x) {
     // for R the (row-wise) rays of a facet of a simplex, compute the normal x
     // i.e., the vector x such that Rx=0.
     // does so by setting x=(-1)^k det(R[:,:!=i])
@@ -312,7 +313,7 @@ void simp_facet_normal(int *R, int dim, int *x) {
     reduce_by_gcd(x, dim);
 }
 
-void hrep(int *R, int dim, int *H) {
+static void hrep(int *R, int dim, int *H) {
     // get the inwards-facing H-representation of the simplex
     // (iterate over all facets, get the normal, orient so it faces inwards)
     // facets come in order R\i for i=0,1,2,...
@@ -341,7 +342,7 @@ void hrep(int *R, int dim, int *H) {
     }
 }
 
-int simp_contains(
+static int simp_contains(
     Simplex *simp,
     int *vecs,
     int dim,
@@ -420,6 +421,7 @@ int rfp(
         -2: 0 vector input
         -3: couldn't find initial simplex
         -4: too many simplices
+        -100: no idea lol
     */
     // set up some variables
     // ---------------------
@@ -573,7 +575,7 @@ int rfp(
         if (cont_label != -1) {
             // darn... another vector is in cone... subdivide until we're good
 
-            // get cone index
+            // get contained vector index
             for (int i=0; i<num_vecs; ++i) {
                 if (cont_label == labels[i]) {
                     cont_ind = i;
@@ -601,6 +603,7 @@ int rfp(
             }
             // this line should never be hit
             printf("This line should never be hit...\n");
+            return_code = -100;
             goto end;
         }
 
