@@ -1,1 +1,5 @@
-All of the code is in rfp.h. The demo.c file is a demo o fit. We use a hardcoded det to speed up things - these are produced in hardcoded_dets_in_c.py and saved to det.h
+The source code for the Random Fine Pushing triangulation program (rfp). The library is `rfp.h`. This contains everything* necessary to generate random fine pushing triangulations of point/vector configurations. If you want better performance for configurations with moderate dimension, run `hardcoded_leibniz.py` which writes a `det.h` file with hardcoded Laplace expansions of the determinant. This gives significant speedups in some cases. If no `det.h` file exists, the code defaults to a cofactor expansion.
+
+As a simple demo, see `demo.c`. This is an example application which reads vectors and then uses `rfp.h` to construct random fine pushing triangulation(s) of the associated configuration. For some example configurations, see `ntt/data` which includes some scripts for generating simple configurations.
+
+A more interactive demo is in `ntt/rfp/live_triplot.py`, which calls the compiled `demo.c` application repeatedly for the biggest 2-face (in terms of lattice points) in the Kreuzer-Skarke database. A plot of the triangulation is then shown.
