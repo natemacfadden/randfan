@@ -559,7 +559,8 @@ int pushing(
     // get an initial simplex
     // ----------------------
     // shuffle the labels using Fisher-Yates
-    fisher_yates(labels, num_vecs, s);
+    if (opts->random)
+        fisher_yates(labels, num_vecs, s);
 
     // begin with seed_simp = labels[0],labels[1],labels[2],...
     for (int i=0; i<dim; ++i) _inds[i] = i;
@@ -744,7 +745,8 @@ int pushing(
         last_num_labels = num_labels;
 
         // re-shuffle the (now trimmed) labels
-        fisher_yates(labels, num_labels, s);
+        if (opts->random)
+            fisher_yates(labels, num_labels, s);
 
         #if defined(DEBUG) || defined(VERBOSE)
         fprintf(stderr, "%d | %d\n", num_labels, *num_simps);

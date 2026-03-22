@@ -31,15 +31,19 @@ int main(int argc, char **argv) {
     // configuration for pushing call
     PushingOpts opts = {0};
     opts.seed   = 1102;
-    opts.random = 1;
-    opts.fine   = 0;
 
     // parse inputs
     // ------------
     // vectors in row order. Ideally format "[[p0,p1,...],[q0,q1,..],...]"
     char* vecs_in = NULL;
     for (int i = 1; i < argc; i++) {
-        if ((strcmp(argv[i], "--num") == 0) ||
+        if ((strcmp(argv[i], "--random") == 0) ||
+            (strcmp(argv[i], "-r") == 0)) {
+            opts.random = 1;
+        } else if ((strcmp(argv[i], "--fine") == 0) ||
+            (strcmp(argv[i], "-f") == 0)) {
+            opts.fine = 1;
+        } else if ((strcmp(argv[i], "--num") == 0) ||
             (strcmp(argv[i], "-n") == 0)) {
             // user set the number of triangulations
             num_triangs = (int)strtol(argv[++i], NULL, 10);

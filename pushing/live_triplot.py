@@ -2,10 +2,12 @@
 
 """Run pushing seed-by-seed on a data file and show a live-updating triplot.
 
-Usage: python3 live_triplot.py [--data <file>] [--n <int>] [--fct <path>]
-  --data <file>   Input data file (default: data/491_big2face.dat)
-  --n    <int>    Number of seeds to run (default: 100)
-  --fct  <path>   Path to pushing binary (default: ./pushing)
+Usage: python3 live_triplot.py [--data <file>] [--n <int>] [--fct <path>] [--random] [--fine]
+  --data    <file>  Input data file (required)
+  --n       <int>   Number of seeds to run (default: 100)
+  --fct     <path>  Path to pushing binary (default: ./pushing)
+  --random          Pass --random to the binary
+  --fine            Pass --fine to the binary (implies --random)
 """
 
 import sys
@@ -15,9 +17,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def parse_args():
-    data = None
-    n    = 100
-    fct  = "./pushing"
+    data   = None
+    n      = 100
+    fct    = "./pushing"
+    random = False
+    fine   = False
     args = sys.argv[1:]
     while args:
         if args[0] == "--data" and len(args) > 1:
@@ -26,15 +30,21 @@ def parse_args():
             n = int(args[1]); args = args[2:]
         elif args[0] == "--fct" and len(args) > 1:
             fct = args[1]; args = args[2:]
+        elif args[0] == "--random":
+            random = True; args = args[1:]
+        elif args[0] == "--fine":
+            fine = True; args = args[1:]
         else:
             sys.exit(f"Unknown argument: {args[0]}\n{__doc__.strip()}")
 
     if data is None:
         sys.exit(f"--data is required\n{__doc__.strip()}")
+    if fine:
+        random = True  # fine implies random
 
-    return data, n, fct
+    return data, n, fct, random, fine
 
-data_file, n_seeds, fct_bin = parse_args()
+data_file, n_seeds, fct_bin, do_random, do_fine = parse_args()
 
 with open(data_file) as f:
     raw = f.read().strip()
@@ -52,9 +62,14 @@ plt.ion()
 fig, ax = plt.subplots()
 
 for seed in range(n_seeds):
+    cmd = [fct_bin, '--seed', str(seed)]
+    if do_random: cmd.append('--random')
+    if do_fine:   cmd.append('--fine')
+    cmd.append(raw)
+
     try:
         result = subprocess.run(
-            [fct_bin, '--seed', str(seed), raw],
+            cmd,
             capture_output=True, text=True, timeout=30
         )
     except FileNotFoundError:
@@ -82,7 +97,8 @@ for seed in range(n_seeds):
 
     ax.cla()
     ax.set_aspect('auto')
-    ax.set_title(f"seed={seed}")
+    mode = "rfp" if do_fine else ("rp" if do_random else "p")
+    ax.set_title(f"{mode} seed={seed}")
     ax.triplot(pts[:, 0], pts[:, 1], simps, color='steelblue', linewidth=0.6)
     ax.set_xticks([])
     ax.set_yticks([])
