@@ -13,3 +13,11 @@ Pushing triangulations are interesting because they are always regular.
 As with TOPCOM, this also applies to point configurations (PCs/polytopes) if you pass the homogenized points. I.e., put all the points on some affine hyperplane. Easiest way is to take each point and append/prepend them all, uniformly, with a component $1$. E.g., represent the PC $[[0,0], [0,1], [1,0], [1,1]]$ as the 'acyclic VC' $[[0,0,1], [0,1,1], [1,0,1], [1,1,1]]$.
 
 The greedy method seems to always generate a fine triangulation for a PC (i.e., an acyclic VC). For general VCs, sometimes the greedy algorithm gets stuck in a situation where it cannot add more vectors due to the previously added vectors.
+
+Compile this with
+`clang -g -o ncube ncube.c&& clang -g -o rfp demo.c `
+
+Run this with
+`./ncube 5 | ./rfp -n 1000`
+or even
+`python live_triplot.py --n 1000`
