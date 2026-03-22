@@ -12,7 +12,9 @@ from itertools import permutations
 
 
 def gen_terms(n):
-    """Return list of (sign, [col indices]) for the Leibniz expansion of an nxn det."""
+    """
+    Return list of (sign, [col indices]) for Leibniz expansion of an nxn det.
+    """
     terms = []
     for p in permutations(range(n)):
         # compute sign of permutation
@@ -45,6 +47,7 @@ def term_to_c(sign, cols, n):
 def gen_function(n):
     terms = gen_terms(n)
     lines = []
+    lines.append(f"#define DET{n}")
     lines.append(f"static int det{n}(int *M) {{")
     lines.append(f"    return")
     term_strs = [f"        {term_to_c(s, cols, n)}" for s, cols in terms]
