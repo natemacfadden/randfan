@@ -1,11 +1,8 @@
-#ifndef RFP_H
-#define RFP_H
+#ifndef PUSHING_H
+#define PUSHING_H
 
 //#define VERBOSE
 //#define DEBUG
-
-// copying could be reduced significantly in this code...
-
 
 
 // HEADER
@@ -14,22 +11,24 @@
 
 /*
 **Description:**
-Constructs a random regular fan. I.e., a random regular triangulation of the
-vector configuration defined by the input vectors.
-
-Does so via pushing-style arguments.
+Constructs a pushing triangulation/fan of the input vectors. Optionally,
+- random or
+- random & fine.
+These configurations are set by user-specified arguments in PushingOpts.
 
 **Arguments:**
 - `vecs`:          The input vectors.
 - `dim`:           The dimension of the vector configuration.
 - `num_vecs`:      The number of vectors input.
-- `max_num_simps`: Max allowed number of simplices - to prevent writing out of
-                   simps container.
-// rng
-- `seed`:          A seed for xoshiro256++ RNG. First passed through splitmix64.
-// output objects
-- `simps`:         A container for the simplices.
-- `num_simps`:     The number of simplices written.
+// configuration
+- `opts`:          Configuration for algorithm. Whether to output a
+                   triangulation using the input vector order, a random
+                   triangulation, or a random & fine triangulation.
+// simplices objects
+- `max_num_simps`: Max allowed number of simplices - to prevent writing out
+                   of simps container.
+- `simps`:         OUTPUT: A container for the simplices.
+- `num_simps`:     OUTPUT: The number of simplices written.
 
 **Returns:**
 A status code according to following list:
@@ -39,12 +38,18 @@ A status code according to following list:
     -3: couldn't find initial simplex
     -100: error in splitting a cone - see code
 */
-int rfp(
+typedef struct {
+    int random;
+    int fine;
+    uint64_t seed;
+} PushingOpts;
+
+int pushing(
     int *vecs,
     int dim,
     int num_vecs,
+    PushingOpts *opts,
     int max_num_simps,
-    uint64_t *seed,
     uint32_t *simps,
     int *num_simps
 );
@@ -52,7 +57,7 @@ int rfp(
 
 // IMPLEMENTATION
 // ==============
-#ifdef RFP_IMPLEMENTATION
+#ifdef PUSHING_IMPLEMENTATION
 
 #ifndef MAX_DIM
 #define MAX_DIM 8
@@ -104,7 +109,7 @@ static inline uint64_t rotl(const uint64_t x, int k) {
 }
 
 
-//static uint64_t s[4]; -- removed for parallelism concerns in rfp
+//static uint64_t s[4]; -- removed for parallelism concerns
 // (all methods below will have `void` argument changed to uint64_t s[4])
 
 uint64_t next(uint64_t s[4]) {
@@ -417,36 +422,38 @@ static int simp_contains(
     return -1;
 }
 
-// RFP BEGINS
+// PUSHING BEGINS
 // ==============
-int rfp(
+int pushing(
     int *vecs,
     int dim,
     int num_vecs,
+    PushingOpts *opts,
     int max_num_simps,
-    uint64_t *seed,
     uint32_t *simps,
-    int *num_simps)
+    int *num_simps
+)
 {
     /*
     **Description:**
-    Constructs a random regular fan. I.e., a random regular triangulation of the
-    vector configuration defined by the input vectors.
-
-    Does so via pushing-style arguments.
+    Constructs a pushing triangulation/fan of the input vectors. Optionally,
+    - random or
+    - random & fine.
+    These configurations are set by user-specified arguments in PushingOpts.
 
     **Arguments:**
     - `vecs`:          The input vectors.
     - `dim`:           The dimension of the vector configuration.
     - `num_vecs`:      The number of vectors input.
+    // configuration
+    - `opts`:          Configuration for algorithm. Whether to output a
+                       triangulation using the input vector order, a random
+                       triangulation, or a random & fine triangulation.
+    // simplices objects
     - `max_num_simps`: Max allowed number of simplices - to prevent writing out
                        of simps container.
-    // rng
-    - `seed`:          A seed for xoshiro256++ RNG. First passed through
-                       splitmix64.
-    // output objects
-    - `simps`:         A container for the simplices.
-    - `num_simps`:     The number of simplices written.
+    - `simps`:         OUTPUT: A container for the simplices.
+    - `num_simps`:     OUTPUT: The number of simplices written.
 
     **Returns:**
     A status code according to following list:
@@ -454,7 +461,6 @@ int rfp(
         -1: memory allocation problem
         -2: 0 vector input
         -3: couldn't find initial simplex
-        -4: too many simplices
         -100: error in splitting a cone - see code
     */
     // set up some variables
@@ -520,10 +526,10 @@ int rfp(
 
     // seed the RNG
     // ------------
-    s[0] = splitmix64(seed);
-    s[1] = splitmix64(seed);
-    s[2] = splitmix64(seed);
-    s[3] = splitmix64(seed);
+    s[0] = splitmix64(&opts->seed);
+    s[1] = splitmix64(&opts->seed);
+    s[2] = splitmix64(&opts->seed);
+    s[3] = splitmix64(&opts->seed);
 
     // get an initial simplex
     // ----------------------
@@ -903,7 +909,7 @@ int rfp(
     // end goto
     // --------
     end:
-        *seed = next(s); // update the seed (in case multiple calls are made)
+        opts->seed = next(s); // update the seed (in case multiple calls are made)
 
         free(_simps);
         free(visible_isimp);

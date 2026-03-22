@@ -1,5 +1,5 @@
-#define RFP_IMPLEMENTATION
-#include "rfp.h"
+#define PUSHING_IMPLEMENTATION
+#include "pushing.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -26,8 +26,11 @@ void usage(const char *prog) {
 int main(int argc, char **argv) {
     // default variables
     int num_triangs   = 1;
-    uint64_t rng_seed = 1102;
     int max_num_simps = 100000;
+
+    // configuration for pushing call
+    PushingOpts opts = {0};
+    opts.seed = 1102;
 
     // parse inputs
     // ------------
@@ -42,7 +45,7 @@ int main(int argc, char **argv) {
         } else if ((strcmp(argv[i], "--seed") == 0) ||
                    (strcmp(argv[i], "-s") == 0)) {
             // user set RNG seed
-            rng_seed = strtoull(argv[++i], NULL, 10);
+            opts.seed = strtoull(argv[++i], NULL, 10);
 
         } else if (strcmp(argv[i], "--maxnumsimps") == 0) {
             // user set max number of simplices
@@ -115,10 +118,10 @@ int main(int argc, char **argv) {
     int num_simps;
 
     for (int itriang=0; itriang<num_triangs; ++itriang) {
-        int retval = rfp(
+        int retval = pushing(
             vecs, dim, num_vecs,
-            max_num_simps, &rng_seed,
-            simps, &num_simps);
+            &opts,
+            max_num_simps, simps, &num_simps);
 
         if (retval != 0) { printf("return code %d...\n", retval); continue; }
 
