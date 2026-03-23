@@ -260,10 +260,9 @@ def _fill_sph_triangle(
     """
     Fill the spherical triangle whose sides are great-circle arcs u–v–w.
 
-    For each screen pixel in the arc bounding box the pixel is back-projected
-    onto the unit sphere (orthographic along p) and tested against the three
-    half-spaces defined by the edge normals.  This ensures the fill exactly
-    matches the curved arc boundaries rather than the flat projected triangle.
+    Each screen row is processed as a numpy array so the per-pixel back-
+    projection and triangle test are vectorised.  A single addstr call per
+    contiguous filled run eliminates per-pixel Python overhead.
     """
     rows, cols = scr.getmaxyx()
     cx, cy = cols // 2, rows // 2
@@ -290,30 +289,51 @@ def _fill_sph_triangle(
     rmax = min(rows - 2, max(r_vals))
     cmin = max(0,        min(c_vals))
     cmax = min(cols - 2, max(c_vals))
+    if rmin > rmax or cmin > cmax:
+        return
 
     # Edge normals for spherical point-in-triangle test.
     nAB = np.cross(u, v)
     nBC = np.cross(v, w)
     nCA = np.cross(w, u)
-    # Orient consistently: centroid should be inside all three half-spaces.
     if float(np.dot(nAB, u + v + w)) < 0.0:
         nAB = -nAB; nBC = -nBC; nCA = -nCA
 
+    # Project each edge normal onto the tangent-plane basis + p once.
+    # dot(n, direction) = n_e2*tx + n_e1*ty + n_p*sqrt(1-mag2)
+    nAB_e2, nAB_e1, nAB_p = float(np.dot(nAB, e2)), float(np.dot(nAB, e1)), float(np.dot(nAB, p))
+    nBC_e2, nBC_e1, nBC_p = float(np.dot(nBC, e2)), float(np.dot(nBC, e1)), float(np.dot(nBC, p))
+    nCA_e2, nCA_e1, nCA_p = float(np.dot(nCA, e2)), float(np.dot(nCA, e1)), float(np.dot(nCA, p))
+
+    sc2 = scale * 2.0
+    c_arr = np.arange(cmin, cmax + 1)
+    TX    = (c_arr - cx) / sc2        # shape (ncols,)
+
     for r in range(rmin, rmax + 1):
-        for c in range(cmin, cmax + 1):
-            tx   = (c - cx) / (scale * 2.0)
-            ty   = (cy - r) / scale
-            mag2 = tx * tx + ty * ty
-            if mag2 >= 1.0:
-                continue
-            direction = tx * e2 + ty * e1 + float(np.sqrt(1.0 - mag2)) * p
-            if (float(np.dot(nAB, direction)) > 0.0
-                    and float(np.dot(nBC, direction)) > 0.0
-                    and float(np.dot(nCA, direction)) > 0.0):
-                try:
-                    scr.addstr(r, c, ch, attr)
-                except curses.error:
-                    pass
+        ty   = (cy - r) / scale
+        mag2 = TX * TX + ty * ty
+        on_sphere = mag2 < 1.0
+        if not np.any(on_sphere):
+            continue
+        Z      = np.sqrt(np.maximum(0.0, 1.0 - mag2))  # vectorised sqrt
+        inside = (on_sphere
+                  & (nAB_e2 * TX + nAB_e1 * ty + nAB_p * Z > 0.0)
+                  & (nBC_e2 * TX + nBC_e1 * ty + nBC_p * Z > 0.0)
+                  & (nCA_e2 * TX + nCA_e1 * ty + nCA_p * Z > 0.0))
+        idx = np.where(inside)[0]
+        if idx.size == 0:
+            continue
+        # Draw each contiguous run with a single addstr call.
+        gaps   = np.where(np.diff(idx) > 1)[0] + 1
+        starts = np.concatenate(([0], gaps))
+        ends   = np.concatenate((gaps - 1, [len(idx) - 1]))
+        for s, e in zip(starts, ends):
+            c0 = cmin + int(idx[s])
+            n  = int(idx[e]) - int(idx[s]) + 1
+            try:
+                scr.addstr(r, c0, ch * n, attr)
+            except curses.error:
+                pass
 
 
 def _fill_triangle_colored(
