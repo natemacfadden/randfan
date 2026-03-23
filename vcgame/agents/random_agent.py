@@ -28,9 +28,10 @@ if TYPE_CHECKING:
     from src.player import Player
 
 
-_L_MIN     = 0.2   # minimum arc length (radians)
-_LOG_K_MU  = 0.0   # log-curvature mean  → κ ≈ 1.0  (≈ 57° radius)
-_LOG_K_SIG = 0.7   # log-curvature std   → 68 % of radii in [28°, 115°]
+_L_MIN        = 0.2   # minimum arc length (radians)
+_LOG_K_MU     = 0.0   # log-curvature mean  → κ ≈ 1.0  (≈ 57° radius)
+_LOG_K_SIG    = 0.7   # log-curvature std   → 68 % of radii in [28°, 115°]
+_MAX_TURN_STEP = 0.08  # max heading rotation (rad) per advance call
 
 
 class RandomAgent:
@@ -85,6 +86,15 @@ class RandomAgent:
         """**Description:** The player being controlled."""
         return self._player
 
+    @property
+    def step(self) -> float:
+        """**Description:** Arc length advanced per call to `advance`."""
+        return self._step
+
+    @step.setter
+    def step(self, value: float) -> None:
+        self._step = float(value)
+
     def _new_arc(self) -> None:
         """
         **Description:**
@@ -100,6 +110,10 @@ class RandomAgent:
         log_kappa   = np.random.normal(_LOG_K_MU, _LOG_K_SIG)
         sign        = float(np.random.choice([-1.0, 1.0]))
         self._kappa = sign * np.exp(log_kappa)
+        # Cap arc to avoid long spirals (≤ ~216° of heading rotation).
+        self._arc_remaining = min(
+            self._arc_remaining, 1.2 * np.pi / abs(self._kappa)
+        )
 
     def advance(self, fan: Fan | None = None) -> None:
         """
@@ -116,7 +130,9 @@ class RandomAgent:
         """
         if self._arc_remaining <= 0.0:
             self._new_arc()
-        s = min(self._step, self._arc_remaining)
+        # Limit arc per step by curvature so tight spirals take more steps.
+        s = min(self._step, self._arc_remaining,
+                _MAX_TURN_STEP / abs(self._kappa))
         self._player.turn(self._kappa * s)
         self._player.move(s, fan)
         self._arc_remaining -= s
