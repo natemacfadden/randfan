@@ -33,7 +33,7 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--shape",
-        choices=["cube", "trunc_oct", "random"],
+        choices=["cube", "trunc_oct", "random", "reflexive"],
         default="cube",
         help="Vector configuration shape (default: cube).",
     )
@@ -43,6 +43,13 @@ def _parse_args() -> argparse.Namespace:
         default=1102,
         metavar="N",
         help="RNG seed for --shape random (default: 1102).",
+    )
+    p.add_argument(
+        "--polytope",
+        type=int,
+        default=0,
+        metavar="ID",
+        help="Reflexive polytope id 0–4318 for --shape reflexive (default: 0).",
     )
     p.add_argument(
         "-d",
@@ -63,6 +70,10 @@ def main() -> None:
         from src.generate_random import random_fan, random_vc
         fan = random_fan(seed=args.seed)
         vc  = random_vc(seed=args.seed)
+    elif args.shape == "reflexive":
+        from src.generate_reflexive import reflexive_fan, reflexive_vc
+        fan = reflexive_fan(polytope_id=args.polytope)
+        vc  = reflexive_vc(polytope_id=args.polytope)
     else:
         from src.generate_cube import cube_fan, cube_vc
         fan = cube_fan(3)

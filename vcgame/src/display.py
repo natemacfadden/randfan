@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 _RADIUS_PAIR_START = 6
 _EDGE_PAIR_BASE    = 40   # pairs 40-43: front-flip, front-noflip, other-flip, other-noflip
 _IREG_BG_PAIR      = 50   # pair for irregular-fan background tint
+_FILL_PAIR         = 51   # dim fill for visible surface patches
 
 # (r, g, b) in 0–1000 range for curses
 _VIRIDIS_KEYS: list[tuple[int, int, int]] = [
@@ -244,6 +245,77 @@ def _ray_intersects_triangle(
     return t if t > 1e-6 else None
 
 
+def _fill_sph_triangle(
+    scr: _CursesWindow,
+    u: np.ndarray,
+    v: np.ndarray,
+    w: np.ndarray,
+    p: np.ndarray,
+    e1: np.ndarray,
+    e2: np.ndarray,
+    scale: float,
+    ch: str,
+    attr: int,
+) -> None:
+    """
+    Fill the spherical triangle whose sides are great-circle arcs u–v–w.
+
+    For each screen pixel in the arc bounding box the pixel is back-projected
+    onto the unit sphere (orthographic along p) and tested against the three
+    half-spaces defined by the edge normals.  This ensures the fill exactly
+    matches the curved arc boundaries rather than the flat projected triangle.
+    """
+    rows, cols = scr.getmaxyx()
+    cx, cy = cols // 2, rows // 2
+
+    # Bounding box: sample the three boundary arcs.
+    r_vals: list[int] = []
+    c_vals: list[int] = []
+    for a, b in ((u, v), (v, w), (w, u)):
+        cos_ab = float(np.clip(np.dot(a, b), -1.0, 1.0))
+        theta  = float(np.arccos(cos_ab))
+        n_s    = max(2, int(theta / 0.05))
+        sin_t  = float(np.sin(theta))
+        for i in range(n_s + 1):
+            t  = i / n_s
+            pt = (
+                (np.sin((1.0 - t) * theta) / sin_t) * a
+                + (np.sin(t * theta)        / sin_t) * b
+            ) if sin_t > 1e-9 else a
+            vp = pt - float(np.dot(pt, p)) * p
+            r_vals.append(cy - int(round(float(np.dot(vp, e1)) * scale)))
+            c_vals.append(cx + int(round(float(np.dot(vp, e2)) * scale * 2)))
+
+    rmin = max(0,        min(r_vals))
+    rmax = min(rows - 2, max(r_vals))
+    cmin = max(0,        min(c_vals))
+    cmax = min(cols - 2, max(c_vals))
+
+    # Edge normals for spherical point-in-triangle test.
+    nAB = np.cross(u, v)
+    nBC = np.cross(v, w)
+    nCA = np.cross(w, u)
+    # Orient consistently: centroid should be inside all three half-spaces.
+    if float(np.dot(nAB, u + v + w)) < 0.0:
+        nAB = -nAB; nBC = -nBC; nCA = -nCA
+
+    for r in range(rmin, rmax + 1):
+        for c in range(cmin, cmax + 1):
+            tx   = (c - cx) / (scale * 2.0)
+            ty   = (cy - r) / scale
+            mag2 = tx * tx + ty * ty
+            if mag2 >= 1.0:
+                continue
+            direction = tx * e2 + ty * e1 + float(np.sqrt(1.0 - mag2)) * p
+            if (float(np.dot(nAB, direction)) > 0.0
+                    and float(np.dot(nBC, direction)) > 0.0
+                    and float(np.dot(nCA, direction)) > 0.0):
+                try:
+                    scr.addstr(r, c, ch, attr)
+                except curses.error:
+                    pass
+
+
 def _fill_triangle_colored(
     scr: _CursesWindow,
     pts: list[tuple[int, int]],
@@ -375,6 +447,13 @@ class Renderer:
                 curses.init_pair(_IREG_BG_PAIR, -1, _cb + 4)
             else:
                 curses.init_pair(_IREG_BG_PAIR, -1, curses.COLOR_RED)
+            # Dim fill for visible surface patches (foreground colour so block
+            # chars are visible without needing a background colour).
+            if curses.COLORS > _cb + 5 and curses.COLOR_PAIRS > _FILL_PAIR:
+                curses.init_color(_cb + 5, 250, 280, 480)  # dim blue-gray
+                curses.init_pair(_FILL_PAIR, _cb + 5, -1)
+            else:
+                curses.init_pair(_FILL_PAIR, curses.COLOR_BLUE, -1)
         else:
             for i, fg in enumerate([curses.COLOR_BLUE, curses.COLOR_CYAN,
                                      curses.COLOR_GREEN, curses.COLOR_YELLOW,
@@ -386,6 +465,7 @@ class Renderer:
             curses.init_pair(_EDGE_PAIR_BASE + 2, curses.COLOR_GREEN, -1)
             curses.init_pair(_EDGE_PAIR_BASE + 3, curses.COLOR_RED,   -1)
             curses.init_pair(_IREG_BG_PAIR, -1, curses.COLOR_RED)
+            curses.init_pair(_FILL_PAIR, curses.COLOR_BLUE, -1)
 
     def draw(
         self,
@@ -399,6 +479,7 @@ class Renderer:
         view_scale:   float = 1.0,
         flip_status:  dict  | None = None,
         is_irregular: bool  = False,
+        sphere_mode:  bool  = False,
     ) -> None:
         """
         **Description:**
@@ -425,6 +506,10 @@ class Renderer:
         rows, cols = scr.getmaxyx()
         cy, cx = rows // 2, cols // 2
         scale  = float(min(rows, cols // 2) // 2 - 2) * 0.75 * view_scale
+        if sphere_mode:
+            # Fit the equator (max projected distance = 1.0) to within
+            # 2 rows of the screen edge, leaving a small margin.
+            scale = float(max(1, rows // 2 - 2))
 
         p        = player_pos
         e1       = player_heading
@@ -443,14 +528,21 @@ class Renderer:
 
         def ray(label: int) -> np.ndarray:
             if label not in ray_cache:
-                ray_cache[label] = fan.vectors(which=(label,))[0]
+                v = fan.vectors(which=(label,))[0]
+                if sphere_mode:
+                    n = float(np.linalg.norm(v))
+                    if n > 1e-12:
+                        v = v / n
+                ray_cache[label] = v
             return ray_cache[label]
 
         front_cones: set[tuple[int, ...]] = set()
+        all_cones_list: list[tuple[int, ...]] = []
         cone_normals: dict[tuple[int, ...], np.ndarray] = {}
         for cone in fan.cones():
             clabels = list(cone)
             ct = tuple(sorted(clabels))
+            all_cones_list.append(ct)
             vs = [ray(l) for l in clabels]
             n  = np.cross(vs[1] - vs[0], vs[2] - vs[0])
             if np.dot(n, vs[0]) < 0:
@@ -471,16 +563,47 @@ class Renderer:
             return (row, col)
 
         def _draw_edge(a: int, b: int, ch: str, attr: int) -> None:
-            ca = _project(ray(a), view_dir, e1_new, e2_new)
-            cb = _project(ray(b), view_dir, e1_new, e2_new)
-            if ca is None or cb is None:
+            if not sphere_mode:
+                ca = _project(ray(a), view_dir, e1_new, e2_new)
+                cb = _project(ray(b), view_dir, e1_new, e2_new)
+                if ca is None or cb is None:
+                    return
+                c0 = cx + int(round(ca[0] * scale * 2))
+                r0 = cy - int(round(ca[1] * scale))
+                c1 = cx + int(round(cb[0] * scale * 2))
+                r1 = cy - int(round(cb[1] * scale))
+                _draw_line(scr, r0,     c0, r1,     c1, ch, attr)
+                _draw_line(scr, r0 + 1, c0, r1 + 1, c1, ch, attr)
                 return
-            c0 = cx + int(round(ca[0] * scale * 2))
-            r0 = cy - int(round(ca[1] * scale))
-            c1 = cx + int(round(cb[0] * scale * 2))
-            r1 = cy - int(round(cb[1] * scale))
-            _draw_line(scr, r0,     c0, r1,     c1, ch, attr)
-            _draw_line(scr, r0 + 1, c0, r1 + 1, c1, ch, attr)
+            # Sphere mode: trace the great circle arc via SLERP.
+            # ray() already returns unit vectors in sphere mode.
+            u = ray(a)
+            v = ray(b)
+            cos_a   = float(np.clip(np.dot(u, v), -1.0, 1.0))
+            theta   = float(np.arccos(cos_a))
+            n_steps = max(2, int(theta / 0.04))
+            sin_th  = float(np.sin(theta))
+            prev: tuple[int, int] | None = None
+            for i in range(n_steps + 1):
+                t = i / n_steps
+                w = (
+                    (np.sin((1.0 - t) * theta) / sin_th) * u
+                    + (np.sin(t * theta) / sin_th) * v
+                ) if sin_th > 1e-9 else u
+                # Clip at the equator: don't draw back-hemisphere arc segments.
+                if float(np.dot(w, view_dir)) < 0.0:
+                    prev = None
+                    continue
+                coord = _project(w, view_dir, e1_new, e2_new)
+                if coord is None:
+                    prev = None
+                    continue
+                col_w = cx + int(round(coord[0] * scale * 2))
+                row_w = cy - int(round(coord[1] * scale))
+                if prev is not None:
+                    _draw_line(scr, prev[0],     prev[1], row_w,     col_w, ch, attr)
+                    _draw_line(scr, prev[0] + 1, prev[1], row_w + 1, col_w, ch, attr)
+                prev = (row_w, col_w)
 
         if color_mode == 1:
             _r_max = float(
@@ -574,69 +697,139 @@ class Renderer:
                         break
                 _m3_vis[_ct0] = _ok
 
-        for ct in sorted_front:
-            clabels = list(ct)
-            pts = [screen_pt(l) for l in clabels]
-            if any(pt is None for pt in pts):
-                continue
-            # Painter's-algorithm occlusion: flood the triangle with background
-            # before drawing content so near faces erase far edges beneath them.
-            _fill_triangle(scr, pts, " ", 0)  # type: ignore[arg-type]
-            if color_mode == 2:
-                if _m3_vis.get(ct, False):
-                    _vv_f, _c_f, _nf_f = _m3_faces[ct]
-                    # Per-pixel brightness: cone falloff × Lambertian.
-                    # cone_t = 1 at heading axis, 0 at cone edge.
-                    # lam    = face orientation relative to incoming ray.
-                    def _cfn(
-                        v:    np.ndarray,
-                        _src: np.ndarray = _p_src,
-                        _e1:  np.ndarray = _h_proj,
-                        _nf:  np.ndarray = _nf_f,
-                        _ct:  float      = _cos_tmax,
-                    ) -> float:
-                        _dv  = v - _src
-                        _dn  = float(np.linalg.norm(_dv))
-                        if _dn < 1e-12:
-                            return 0.0
-                        _dir  = _dv / _dn
-                        cos_a = float(np.dot(_dir, _e1))
-                        if cos_a <= _ct:
-                            return 0.0
-                        cone_t    = (cos_a - _ct) / (1.0 - _ct)
-                        lam       = max(0.0, float(np.dot(_nf, -_dir)))
-                        dist_fall = 1.0 / (1.0 + _dn * _dn)
-                        return cone_t * cone_t * lam * dist_fall
-                    _fill_triangle_colored(
-                        scr, pts, _vv_f, _cfn,
+        if sphere_mode:
+            # Sphere visibility.  Two separate sets:
+            #
+            #   sphere_front_edge: centroid dot view_dir > 0.  Used for edges.
+            #     An edge is drawn if it belongs to any cone in this set AND
+            #     at least one of its two vertices is in the front hemisphere
+            #     (avoids drawing edges where both endpoints are behind the equator
+            #     even though the triangle centroid is just barely front-facing).
+            #
+            #   sphere_front_fill: any vertex dot view_dir > 0.  Used for fills.
+            #     More inclusive so triangles near the equator whose centroid is
+            #     slightly behind still have their visible area filled.
+            sphere_front_edge: set[tuple[int, ...]] = set()
+            sphere_front_fill: set[tuple[int, ...]] = set()
+            for ct in all_cones_list:
+                vs   = [ray(l) for l in ct]
+                dots = [float(np.dot(v, view_dir)) for v in vs]
+                if dots[0] + dots[1] + dots[2] > 0:
+                    sphere_front_edge.add(ct)
+                if any(d > 0 for d in dots):
+                    sphere_front_fill.add(ct)
+
+            # Fill pass (color_mode != 0): back-to-front, correct arc-bounded
+            # geometry via back-projection.
+            if color_mode != 0:
+                _sorted_sph = sorted(
+                    sphere_front_fill,
+                    key=lambda ct: float(
+                        np.dot(np.mean([ray(l) for l in ct], axis=0), view_dir)
+                    ),
+                )
+                for ct in _sorted_sph:
+                    u, v, w = [ray(l) for l in ct]
+                    _fill_sph_triangle(
+                        scr, u, v, w,
+                        view_dir, e1_new, e2_new, scale,
+                        "\u2591", curses.color_pair(_FILL_PAIR),
+                    )
+
+            # Arc pass — drawn after fills so arcs always appear on top.
+            _drawn_edges: set[tuple[int, int]] = set()
+            for ct in sphere_front_edge:
+                clabels = list(ct)
+                for i in range(len(clabels)):
+                    a, b = clabels[i], clabels[(i + 1) % len(clabels)]
+                    edge = (min(a, b), max(a, b))
+                    if edge in _drawn_edges:
+                        continue
+                    _drawn_edges.add(edge)
+                    # Skip edges where both endpoints are behind the equator.
+                    if (float(np.dot(ray(a), view_dir)) < 0 and
+                            float(np.dot(ray(b), view_dir)) < 0):
+                        continue
+                    if pointed_facet and edge == pointed_facet:
+                        continue
+                    is_active = edge in active_edge_set
+                    if is_active and flip_status is not None:
+                        flippable = flip_status.get(edge, False)
+                        ch_e   = "+"
+                        attr_e = curses.color_pair(
+                            _EDGE_PAIR_BASE + (2 if flippable else 3)
+                        )
+                    elif is_active:
+                        ch_e   = "+"
+                        attr_e = curses.color_pair(2) | curses.A_BOLD
+                    else:
+                        ch_e   = "."
+                        attr_e = curses.color_pair(1)
+                    _draw_edge(a, b, ch_e, attr_e)
+        else:
+            for ct in sorted_front:
+                clabels = list(ct)
+                pts = [screen_pt(l) for l in clabels]
+                if any(pt is None for pt in pts):
+                    continue
+                # Painter's-algorithm occlusion: flood the triangle with background
+                # before drawing content so near faces erase far edges beneath them.
+                _fill_triangle(scr, pts, " ", 0)  # type: ignore[arg-type]
+                if color_mode == 2:
+                    if _m3_vis.get(ct, False):
+                        _vv_f, _c_f, _nf_f = _m3_faces[ct]
+                        # Per-pixel brightness: cone falloff × Lambertian.
+                        # cone_t = 1 at heading axis, 0 at cone edge.
+                        # lam    = face orientation relative to incoming ray.
+                        def _cfn(
+                            v:    np.ndarray,
+                            _src: np.ndarray = _p_src,
+                            _e1:  np.ndarray = _h_proj,
+                            _nf:  np.ndarray = _nf_f,
+                            _ct:  float      = _cos_tmax,
+                        ) -> float:
+                            _dv  = v - _src
+                            _dn  = float(np.linalg.norm(_dv))
+                            if _dn < 1e-12:
+                                return 0.0
+                            _dir  = _dv / _dn
+                            cos_a = float(np.dot(_dir, _e1))
+                            if cos_a <= _ct:
+                                return 0.0
+                            cone_t    = (cos_a - _ct) / (1.0 - _ct)
+                            lam       = max(0.0, float(np.dot(_nf, -_dir)))
+                            dist_fall = 1.0 / (1.0 + _dn * _dn)
+                            return cone_t * cone_t * lam * dist_fall
+                        _fill_triangle_colored(
+                            scr, pts, _vv_f, _cfn,
+                            self._n_radius, _RADIUS_PAIR_START,
+                        )
+                elif _color_fn is not None:
+                    _fill_triangle_colored(  # type: ignore[arg-type]
+                        scr, pts,
+                        [ray(l) for l in clabels],
+                        _color_fn,
                         self._n_radius, _RADIUS_PAIR_START,
                     )
-            elif _color_fn is not None:
-                _fill_triangle_colored(  # type: ignore[arg-type]
-                    scr, pts,
-                    [ray(l) for l in clabels],
-                    _color_fn,
-                    self._n_radius, _RADIUS_PAIR_START,
-                )
-            for i in range(len(clabels)):
-                a, b = clabels[i], clabels[(i + 1) % len(clabels)]
-                edge = (min(a, b), max(a, b))
-                if pointed_facet and edge == pointed_facet:
-                    continue
-                is_active = edge in active_edge_set
-                if is_active and flip_status is not None:
-                    flippable = flip_status.get(edge, False)
-                    ch_e   = "+"
-                    attr_e = curses.color_pair(
-                        _EDGE_PAIR_BASE + (2 if flippable else 3)
-                    )
-                elif is_active:
-                    ch_e   = "+"
-                    attr_e = curses.color_pair(2) | curses.A_BOLD
-                else:
-                    ch_e   = "."
-                    attr_e = curses.color_pair(1)
-                _draw_edge(a, b, ch_e, attr_e)
+                for i in range(len(clabels)):
+                    a, b = clabels[i], clabels[(i + 1) % len(clabels)]
+                    edge = (min(a, b), max(a, b))
+                    if pointed_facet and edge == pointed_facet:
+                        continue
+                    is_active = edge in active_edge_set
+                    if is_active and flip_status is not None:
+                        flippable = flip_status.get(edge, False)
+                        ch_e   = "+"
+                        attr_e = curses.color_pair(
+                            _EDGE_PAIR_BASE + (2 if flippable else 3)
+                        )
+                    elif is_active:
+                        ch_e   = "+"
+                        attr_e = curses.color_pair(2) | curses.A_BOLD
+                    else:
+                        ch_e   = "."
+                        attr_e = curses.color_pair(1)
+                    _draw_edge(a, b, ch_e, attr_e)
 
         if pointed_facet:
             a, b = pointed_facet
@@ -662,6 +855,23 @@ class Renderer:
                     except curses.error:
                         pass
 
+        if is_irregular:
+            _ireg_lines = [
+                "                                    ",
+                "   I  R  R  E  G  U  L  A  R        ",
+                "                                    ",
+            ]
+            _ireg_attr = curses.color_pair(_IREG_BG_PAIR) | curses.A_BOLD
+            _ir0 = rows // 2 - len(_ireg_lines) // 2
+            for _ii, _il in enumerate(_ireg_lines):
+                _ir = _ir0 + _ii
+                _ic = max(0, cols // 2 - len(_il) // 2)
+                if 0 <= _ir < rows - 1:
+                    try:
+                        scr.addstr(_ir, _ic, _il[: cols - 1 - _ic], _ireg_attr)
+                    except curses.error:
+                        pass
+
         facet_str = str(pointed_facet) if pointed_facet else "none"
         hud_base = (
             f" pos=({p[0]:+.2f},{p[1]:+.2f},{p[2]:+.2f})"
@@ -669,12 +879,15 @@ class Renderer:
             f"  facet={facet_str}"
             f"  "
         )
-        stay_str  = "[S]tay:ON" if locked else "[S]tay:off"
-        stay_attr = (curses.color_pair(2) | curses.A_BOLD
+        lock_str  = "[F]ix:ON" if locked else "[F]ix:off"
+        lock_attr = (curses.color_pair(2) | curses.A_BOLD
                      if locked else curses.color_pair(4))
         del_str   = "  [D]el:ON" if allow_deletion else "  [D]el:off"
         del_attr  = (curses.color_pair(2) | curses.A_BOLD
                      if allow_deletion else curses.color_pair(4))
+        sph_str   = "  [S]ph:ON" if sphere_mode else "  [S]ph:off"
+        sph_attr  = (curses.color_pair(2) | curses.A_BOLD
+                     if sphere_mode else curses.color_pair(4))
         col_str   = f"  [C]:{_COLOR_LABELS[color_mode]}"
         tail      = "  [q]uit"
         col = 0
@@ -684,11 +897,14 @@ class Renderer:
             col += len(hud_base)
             if col < cols - 1:
                 scr.addstr(rows - 1, col,
-                           stay_str[: cols - 1 - col], stay_attr)
-                col += len(stay_str)
+                           lock_str[: cols - 1 - col], lock_attr)
+                col += len(lock_str)
             if col < cols - 1:
                 scr.addstr(rows - 1, col, del_str[: cols - 1 - col], del_attr)
                 col += len(del_str)
+            if col < cols - 1:
+                scr.addstr(rows - 1, col, sph_str[: cols - 1 - col], sph_attr)
+                col += len(sph_str)
             if col < cols - 1:
                 scr.addstr(rows - 1, col,
                            col_str[: cols - 1 - col], curses.color_pair(4))
@@ -747,8 +963,6 @@ def run_display_demo(
     DECEL      = 0.78   # speed multiplier applied when over-turning
     LAT_ACCEL  = 0.006  # max lateral "acceleration"; critical speed = LAT_ACCEL/TURN
     # Normalise display so vectors of max norm project to a fixed visual radius.
-    # TARGET = 1.9 was chosen so the cube (max_norm=√3) expands slightly and
-    # the truncated octahedron (max_norm=√5) shrinks relative to the cube.
     _TARGET_NORM    = 1.9
     _max_norm       = float(np.linalg.norm(fan.vectors(), axis=1).max()) or 1.0
     _view_scale     = _TARGET_NORM / _max_norm
@@ -757,6 +971,7 @@ def run_display_demo(
     def _main(stdscr: _CursesWindow) -> None:
         curses.curs_set(0)
         stdscr.keypad(True)
+        curses.mousemask(0)   # disable mouse/scroll wheel events
         if agent is None:
             stdscr.nodelay(False)
             player = Player([1.0, 0.2, 0.1], [0.0, 1.0, 0.0])
@@ -766,6 +981,7 @@ def run_display_demo(
         renderer       = Renderer(fan, stdscr)
         allow_deletion = _allow_deletion
         locked         = False
+        sphere_mode    = False
         color_mode     = 0
         _speed         = LAT_ACCEL / TURN  # start at the critical speed
 
@@ -844,12 +1060,14 @@ def run_display_demo(
                 _flip_status[_ek] = _ok
             renderer.draw(player.position, player.heading, cone,
                           facet, locked, allow_deletion, color_mode,
-                          _view_scale, _flip_status, _irregularity[0])
+                          _view_scale, _flip_status, _irregularity[0],
+                          sphere_mode)
             stdscr.refresh()
             key = stdscr.getch()
             if   key == ord("q"):  break
-            elif key == ord("s"):  locked = not locked
+            elif key == ord("f"):  locked = not locked
             elif key == ord("d"):  allow_deletion = not allow_deletion
+            elif key == ord("s"):  sphere_mode = not sphere_mode
             elif key == ord("c"):  color_mode = (color_mode + 1) % len(_COLOR_LABELS)
             elif agent is None:
                 if key == curses.KEY_UP:
