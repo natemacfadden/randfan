@@ -446,10 +446,10 @@ class Renderer:
             f"  tilt={tilt:.2f} az={azimuth:.2f}"
             f"  "
         )
-        lock_str = "[L]ock:ON" if locked else "[L]ock:off"
+        lock_str = "[F]lock:ON" if locked else "[F]lock:off"
         lock_attr = (curses.color_pair(2) | curses.A_BOLD
                      if locked else curses.color_pair(4))
-        del_str   = "  [f]del:ON" if allow_deletion else "  [f]del:off"
+        del_str   = "  [G]del:ON" if allow_deletion else "  [G]del:off"
         del_attr  = (curses.color_pair(2) | curses.A_BOLD
                      if allow_deletion else curses.color_pair(4))
         tail = "  [q]uit"
@@ -471,15 +471,20 @@ class Renderer:
             pass
 
 
-def run_display_demo(fan: Fan, vc: object) -> None:
+def run_display_demo(
+    fan: Fan, vc: object, agent: object = None,
+) -> None:
     """
     **Description:**
-    Launch a curses demo: renders the fan with a player and waits for
-    'q' to quit.
+    Launch a curses demo: renders the fan with a player and waits
+    for 'q' to quit.
 
     **Arguments:**
     - `fan`: A `regfans.Fan` to display.
     - `vc`: A `regfans.VectorConfiguration` for circuit queries.
+    - `agent`: Optional agent with `.player` and `.advance(fan)`.
+      When provided the agent drives movement; arrow keys are
+      disabled and the loop runs at ~20 fps.
 
     **Returns:**
     Nothing.
@@ -493,8 +498,12 @@ def run_display_demo(fan: Fan, vc: object) -> None:
     def _main(stdscr: _CursesWindow) -> None:
         curses.curs_set(0)
         stdscr.keypad(True)
-        stdscr.nodelay(False)
-        player         = Player([1.0, 0.2, 0.1], [0.0, 1.0, 0.0])
+        if agent is None:
+            stdscr.nodelay(False)
+            player = Player([1.0, 0.2, 0.1], [0.0, 1.0, 0.0])
+        else:
+            stdscr.timeout(50)
+            player = agent.player
         renderer       = Renderer(fan, stdscr)
         allow_deletion = False
         locked         = False
@@ -522,25 +531,55 @@ def run_display_demo(fan: Fan, vc: object) -> None:
             renderer._fan      = new_fan
             renderer._edge_map = _cone_edge_map(new_fan)
 
+        def _agent_step() -> None:
+            f        = nonlocal_fan[0]
+            old_cone = player.current_cone(f)
+            agent.advance(f)
+            if locked:
+                return
+            new_cone = player.current_cone(f)
+            if new_cone == old_cone:
+                return
+            circ = player.find_circuit_for_crossing(
+                old_cone, new_cone, f,
+            )
+            if circ is None:
+                return
+            if min(circ.signature) == 1 and not allow_deletion:
+                return
+            new_fan = f.flip(circ)
+            if new_fan is None:
+                return
+            nonlocal_fan[0]    = new_fan
+            renderer._fan      = new_fan
+            renderer._edge_map = _cone_edge_map(new_fan)
+
         while True:
+            if agent is not None:
+                _agent_step()
             f       = nonlocal_fan[0]
             cone    = player.current_cone(f)
             facet   = player.pointed_facet(f)
-            renderer.draw(player.position, player.heading, cone, facet, locked,
-                          allow_deletion, tilt=tilt, azimuth=azimuth)
+            renderer.draw(player.position, player.heading, cone,
+                          facet, locked, allow_deletion,
+                          tilt=tilt, azimuth=azimuth)
             stdscr.refresh()
             key = stdscr.getch()
-            if   key == ord("q"):         break
-            elif key == ord("l"):         locked = not locked
-            elif key == ord("f"):         allow_deletion = not allow_deletion
-            elif key == curses.KEY_UP:    _try_move(STEP)
-            elif key == curses.KEY_DOWN:  _try_move(-STEP)
-            elif key == curses.KEY_LEFT:  player.turn(-TURN)
-            elif key == curses.KEY_RIGHT: player.turn(TURN)
-            elif key == ord("w"):         tilt = max(0.0, tilt - TILT_STEP)
-            elif key == ord("s"):         tilt = min(TILT_MAX, tilt + TILT_STEP)
-            elif key == ord("a"):         azimuth -= AZ_STEP
-            elif key == ord("d"):         azimuth += AZ_STEP
-            else:                         pass
+            if   key == ord("q"):  break
+            elif key == ord("f"):  locked = not locked
+            elif key == ord("g"):  allow_deletion = not allow_deletion
+            elif key == ord("w"):  tilt = max(0.0, tilt - TILT_STEP)
+            elif key == ord("s"):  tilt = min(TILT_MAX, tilt + TILT_STEP)
+            elif key == ord("a"):  azimuth -= AZ_STEP
+            elif key == ord("d"):  azimuth += AZ_STEP
+            elif agent is None:
+                if   key == curses.KEY_UP:    _try_move(STEP)
+                elif key == curses.KEY_DOWN:  _try_move(-STEP)
+                elif key == curses.KEY_LEFT:
+                    player.turn(-TURN)
+                    _try_move(STEP)
+                elif key == curses.KEY_RIGHT:
+                    player.turn(TURN)
+                    _try_move(STEP)
 
     curses.wrapper(_main)
