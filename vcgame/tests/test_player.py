@@ -27,7 +27,7 @@ def _tangent(p: np.ndarray, h: np.ndarray, tol: float = 1e-10) -> bool:
 
 def test_init_position_normalized() -> None:
     p = Player([2.0, 0.0, 0.0], [0.0, 1.0, 0.0])
-    assert _unit(p.position)
+    assert _unit(p.direction)
 
 
 def test_init_heading_normalized() -> None:
@@ -37,21 +37,21 @@ def test_init_heading_normalized() -> None:
 
 def test_init_heading_tangent() -> None:
     p = Player([1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
-    assert _tangent(p.position, p.heading)
+    assert _tangent(p.direction, p.heading)
 
 
 def test_init_heading_gram_schmidt() -> None:
     # heading with component along position is projected out
     p = Player([1.0, 0.0, 0.0], [1.0, 1.0, 0.0])
-    assert _tangent(p.position, p.heading)
+    assert _tangent(p.direction, p.heading)
     assert _unit(p.heading)
 
 
 def test_init_oblique_position() -> None:
     p = Player([1.0, 1.0, 1.0], [0.0, 0.0, 1.0])
-    assert _unit(p.position)
+    assert _unit(p.direction)
     assert _unit(p.heading)
-    assert _tangent(p.position, p.heading)
+    assert _tangent(p.direction, p.heading)
 
 
 def test_init_zero_position_raises() -> None:
@@ -106,7 +106,7 @@ def test_turn_heading_stays_unit() -> None:
 def test_turn_heading_stays_tangent() -> None:
     p = Player([1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
     p.turn(0.7)
-    assert _tangent(p.position, p.heading)
+    assert _tangent(p.direction, p.heading)
 
 
 def test_turn_zero_is_identity() -> None:
@@ -161,7 +161,7 @@ def test_turn_negative_angle() -> None:
 def test_move_position_stays_unit() -> None:
     p = Player([1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
     p.move(0.2)
-    assert _unit(p.position)
+    assert _unit(p.direction)
 
 
 def test_move_heading_stays_unit() -> None:
@@ -173,7 +173,7 @@ def test_move_heading_stays_unit() -> None:
 def test_move_heading_stays_tangent() -> None:
     p = Player([1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
     p.move(0.2)
-    assert _tangent(p.position, p.heading)
+    assert _tangent(p.direction, p.heading)
 
 
 def test_move_zero_is_identity() -> None:
@@ -206,18 +206,18 @@ def test_move_invariants_after_many_steps() -> None:
     p = Player([1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
     for _ in range(30):
         p.move(0.1)
-    assert _unit(p.position)
+    assert _unit(p.direction)
     assert _unit(p.heading)
-    assert _tangent(p.position, p.heading)
+    assert _tangent(p.direction, p.heading)
 
 
 def test_move_with_fan_preserves_invariants(fan3: Fan) -> None:
     p = Player([1.0, 0.2, 0.1], [0.0, 1.0, 0.0])
     for _ in range(30):
         p.move(0.05, fan3)
-    assert _unit(p.position)
+    assert _unit(p.direction)
     assert _unit(p.heading)
-    assert _tangent(p.position, p.heading)
+    assert _tangent(p.direction, p.heading)
 
 
 def test_move_crossing_returns_sorted_pair(fan3: Fan) -> None:
@@ -249,7 +249,7 @@ def test_current_cone_contains_position(fan3: Fan) -> None:
     cone = p.current_cone(fan3)
     vecs = fan3.vectors(which=cone)
     alpha, _, _, _ = np.linalg.lstsq(
-        vecs.T, p.position, rcond=None,
+        vecs.T, p.direction, rcond=None,
     )
     assert np.all(alpha > -1e-10)
 

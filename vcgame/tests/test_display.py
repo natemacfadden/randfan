@@ -68,13 +68,12 @@ def test_viridis_green_increases_end_to_end() -> None:
     assert g1 > g0
 
 
-def test_viridis_midpoint_between_endpoints() -> None:
-    r0, g0, b0 = _viridis_rgb(0.0)
-    r1, g1, b1 = _viridis_rgb(1.0)
+def test_viridis_midpoint_in_range() -> None:
+    # Viridis is not monotone per channel (blue peaks near t=0.5),
+    # so only check that all midpoint values are valid curses color values.
     rm, gm, bm = _viridis_rgb(0.5)
-    assert min(r0, r1) <= rm <= max(r0, r1)
-    assert min(g0, g1) <= gm <= max(g0, g1)
-    assert min(b0, b1) <= bm <= max(b0, b1)
+    for v in (rm, gm, bm):
+        assert 0 <= v <= 1000
 
 
 # ---------------------------------------------------------------
