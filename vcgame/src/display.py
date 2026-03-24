@@ -59,20 +59,26 @@ def _project(
     e1: np.ndarray,
     e2: np.ndarray,
 ) -> tuple[float, float] | None:
-    """
-    **Description:**
-    Project a 3D vector onto the tangent plane at `p`, returning 2D
-    screen coords.
-    Returns `None` if the vector is nearly antipodal to `p`.
+    """Project a 3D vector onto the tangent plane at ``p``.
 
-    **Arguments:**
-    - `v`: Vector to project (need not be unit).
-    - `p`: Player position (unit vector), normal to tangent plane.
-    - `e1`: Tangent basis vector pointing "up" on screen.
-    - `e2`: Tangent basis vector pointing "right" on screen.
+    Returns 2D screen coordinates, or ``None`` if the vector is nearly
+    antipodal to ``p``.
 
-    **Returns:**
-    `(x_screen, y_screen)` or `None` if clipped.
+    Parameters
+    ----------
+    v : np.ndarray
+        Vector to project (need not be unit).
+    p : np.ndarray
+        Player position (unit vector), normal to tangent plane.
+    e1 : np.ndarray
+        Tangent basis vector pointing "up" on screen.
+    e2 : np.ndarray
+        Tangent basis vector pointing "right" on screen.
+
+    Returns
+    -------
+    tuple[float, float] or None
+        ``(x_screen, y_screen)``, or ``None`` if clipped.
     """
     n = np.linalg.norm(v)
     if n < 1e-12:
@@ -85,16 +91,18 @@ def _project(
 
 
 def _cone_edge_map(fan: Fan) -> dict[tuple[int, int], set[tuple[int, ...]]]:
-    """
-    **Description:**
-    Return a mapping from each edge (sorted ray-label pair) to the set of cones
-    (label tuples) that contain it.
+    """Return a mapping from each edge to the set of cones containing it.
 
-    **Arguments:**
-    - `fan`: A `regfans.Fan`.
+    Parameters
+    ----------
+    fan : regfans.Fan
+        The fan to process.
 
-    **Returns:**
-    Dict of `(min_label, max_label)` → set of cone label tuples.
+    Returns
+    -------
+    dict[tuple[int, int], set[tuple[int, ...]]]
+        Maps each sorted ray-label pair ``(min_label, max_label)`` to the
+        set of cone label tuples that contain that edge.
     """
     edge_map: dict[tuple[int, int], set[tuple[int, ...]]] = {}
     for cone in fan.cones():
@@ -116,19 +124,24 @@ def _draw_line(
     ch: str,
     attr: int,
 ) -> None:
-    """
-    **Description:**
-    Draw a line between two screen positions using Bresenham's algorithm.
+    """Draw a line between two screen positions using Bresenham's algorithm.
 
-    **Arguments:**
-    - `scr`: Curses window.
-    - `r0`, `c0`: Start row and column.
-    - `r1`, `c1`: End row and column.
-    - `ch`: Character to draw.
-    - `attr`: Curses attribute.
-
-    **Returns:**
-    Nothing.
+    Parameters
+    ----------
+    scr : _CursesWindow
+        Curses window.
+    r0 : int
+        Start row.
+    c0 : int
+        Start column.
+    r1 : int
+        End row.
+    c1 : int
+        End column.
+    ch : str
+        Character to draw.
+    attr : int
+        Curses attribute.
     """
     rows, cols = scr.getmaxyx()
 
@@ -175,18 +188,37 @@ def _fill_triangle(
     view_dir: np.ndarray | None = None,
     depth_buf: np.ndarray | None = None,
 ) -> None:
-    """
-    Fill a flat-projected triangle.
+    """Fill a flat-projected triangle.
 
-    If `v3d` (three 3-D vertex positions matching `pts`) and
-    `shade_fn(pos, normal, depth, r, c) -> (ch, attr) | None` are both
-    supplied, the position is linearly interpolated across the triangle
-    and the face normal `normalize(cross(v1−v0, v2−v0))` is the constant
-    normal.  `depth = dot(pos, view_dir)` if `view_dir` is provided,
-    else 0.  Returning None from shade_fn skips the pixel.
+    If ``v3d`` (three 3-D vertex positions matching ``pts``) and
+    ``shade_fn(pos, normal, depth, r, c) -> (ch, attr) | None`` are both
+    supplied, the position is linearly interpolated across the triangle and
+    the face normal ``normalize(cross(v1−v0, v2−v0))`` is the constant
+    normal. ``depth = dot(pos, view_dir)`` if ``view_dir`` is provided,
+    else 0. Returning ``None`` from ``shade_fn`` skips the pixel.
 
-    If `depth_buf` (rows×cols float array, init to -inf) is supplied, each
-    pixel is only drawn when its depth exceeds the stored value.
+    If ``depth_buf`` (rows×cols float array, init to ``-inf``) is supplied,
+    each pixel is only drawn when its depth exceeds the stored value.
+
+    Parameters
+    ----------
+    scr : _CursesWindow
+        Curses window.
+    pts : list[tuple[int, int]]
+        Screen coordinates of the three triangle vertices as (row, col).
+    ch : str
+        Fill character used when no shade function is supplied.
+    attr : int
+        Curses attribute used when no shade function is supplied.
+    v3d : list[np.ndarray] or None, optional
+        Three 3-D vertex positions corresponding to ``pts``.
+    shade_fn : callable or None, optional
+        Per-pixel shading function with signature
+        ``(pos, normal, depth, r, c) -> (ch, attr) | None``.
+    view_dir : np.ndarray or None, optional
+        View direction used to compute depth.
+    depth_buf : np.ndarray or None, optional
+        Rows×cols float array (initialised to ``-inf``) for depth testing.
     """
     rows, cols = scr.getmaxyx()
 
@@ -278,17 +310,26 @@ def _ray_intersects_triangle(
     v1: np.ndarray,
     v2: np.ndarray,
 ) -> float | None:
-    """
-    **Description:**
-    Möller–Trumbore ray–triangle intersection.
+    """Möller–Trumbore ray–triangle intersection.
 
-    **Arguments:**
-    - `orig`: Ray origin.
-    - `d`: Ray direction (need not be normalised).
-    - `v0`, `v1`, `v2`: Triangle vertices.
+    Parameters
+    ----------
+    orig : np.ndarray
+        Ray origin.
+    d : np.ndarray
+        Ray direction (need not be normalised).
+    v0 : np.ndarray
+        First triangle vertex.
+    v1 : np.ndarray
+        Second triangle vertex.
+    v2 : np.ndarray
+        Third triangle vertex.
 
-    **Returns:**
-    `t > 0` with `orig + t*d` on the triangle, or `None`.
+    Returns
+    -------
+    float or None
+        ``t > 0`` such that ``orig + t*d`` lies on the triangle, or
+        ``None`` if there is no intersection.
     """
     e1 = v1 - v0
     e2 = v2 - v0
@@ -323,22 +364,50 @@ def _fill_sph_triangle(
     shade_fn=None,
     depth_buf: np.ndarray | None = None,
 ) -> None:
-    """
-    Fill the spherical triangle whose sides are great-circle arcs u–v–w.
+    """Fill the spherical triangle whose sides are great-circle arcs u–v–w.
 
-    Each screen row is processed as a numpy array so the per-pixel back-
-    projection and triangle test are vectorised.  A single addstr call per
-    contiguous filled run eliminates per-pixel Python overhead.
+    Each screen row is processed as a numpy array so the per-pixel
+    back-projection and triangle test are vectorised. A single ``addstr``
+    call per contiguous filled run eliminates per-pixel Python overhead.
 
-    If `shade_fn(pos, normal, depth, r, c) -> (ch, attr) | None` is provided
-    it is called for every filled character.  `pos` and `normal` are the
-    unit-sphere point (= radial normal) at that pixel; `depth` is the
-    Z-component (dot(pos, p)); `r, c` are screen coordinates.  Returning
-    None skips the pixel.  Without shade_fn the fast run-based path is used.
+    If ``shade_fn(pos, normal, depth, r, c) -> (ch, attr) | None`` is
+    provided it is called for every filled character. ``pos`` and ``normal``
+    are the unit-sphere point (= radial normal) at that pixel; ``depth`` is
+    the Z-component ``dot(pos, p)``; ``r, c`` are screen coordinates.
+    Returning ``None`` skips the pixel. Without ``shade_fn`` the fast
+    run-based path is used.
 
-    If `depth_buf` (rows×cols float array, init to -inf) is supplied, each
-    pixel is only drawn when its depth exceeds the stored value, and the
-    buffer is updated on draw.
+    If ``depth_buf`` (rows×cols float array, init to ``-inf``) is supplied,
+    each pixel is only drawn when its depth exceeds the stored value, and
+    the buffer is updated on draw.
+
+    Parameters
+    ----------
+    scr : _CursesWindow
+        Curses window.
+    u : np.ndarray
+        First vertex of the spherical triangle (unit vector).
+    v : np.ndarray
+        Second vertex of the spherical triangle (unit vector).
+    w : np.ndarray
+        Third vertex of the spherical triangle (unit vector).
+    p : np.ndarray
+        View direction (unit vector); defines the projection centre.
+    e1 : np.ndarray
+        Tangent basis vector pointing "up" on screen.
+    e2 : np.ndarray
+        Tangent basis vector pointing "right" on screen.
+    scale : float
+        Projection scale factor (pixels per unit radius).
+    ch : str
+        Fill character used on the fast (no shade function) path.
+    attr : int
+        Curses attribute used on the fast path.
+    shade_fn : callable or None, optional
+        Per-pixel shading function with signature
+        ``(pos, normal, depth, r, c) -> (ch, attr) | None``.
+    depth_buf : np.ndarray or None, optional
+        Rows×cols float array (initialised to ``-inf``) for depth testing.
     """
     rows, cols = scr.getmaxyx()
     cx, cy = cols // 2, rows // 2
@@ -422,28 +491,20 @@ def _fill_sph_triangle(
 
 
 class Renderer:
-    """
-    **Description:**
-    Curses-based renderer for a fan and player position on S². Projects 3D cone
-    edges as flat line segments onto the tangent plane at the player's position.
+    """Curses-based renderer for a fan and player position on S².
 
-    **Arguments:**
-    - `fan`: A `regfans.Fan` whose cones will be drawn.
-    - `stdscr`: A curses window (full screen).
+    Projects 3D cone edges as flat line segments onto the tangent plane at
+    the player's position.
+
+    Parameters
+    ----------
+    fan : regfans.Fan
+        The fan whose cones will be drawn.
+    stdscr : _CursesWindow
+        A curses window (full screen).
     """
 
     def __init__(self, fan: Fan, stdscr: _CursesWindow) -> None:
-        """
-        **Description:**
-        Initialise the renderer with a fan and curses screen.
-
-        **Arguments:**
-        - `fan`: A `regfans.Fan`.
-        - `stdscr`: A curses window.
-
-        **Returns:**
-        Nothing.
-        """
         self._fan        = fan
         self._stdscr     = stdscr
         self._edge_map   = _cone_edge_map(fan)
@@ -525,25 +586,45 @@ class Renderer:
         flashlight:   bool  = False,
         symbol_mode:  int   = 0,
     ) -> None:
-        """
-        **Description:**
-        Render one frame: all cone edges as flat projected line segments,
-        the active cone highlighted, the pointed-at facet highlighted,
-        and the player marker.
+        """Render one frame.
 
-        **Arguments:**
-        - `player_pos`: Unit vector in R³ giving the player's position on S².
-        - `player_heading`: Unit tangent vector at `player_pos` pointing "up".
-        - `current_cone`: Label tuple of the cone containing the player.
-        - `pointed_facet`: Sorted label pair of the facet the player is
-          aiming at, or `None`.
-        - `locked`: Whether movement is locked.
-        - `allow_deletion`: Whether deletion mode is active.
-        - `color_mode`: Fill mode — 0 sun, 1 radius, 2 wireframe.
-        - `flashlight`: Overlay flashlight cone (independent of color mode).
+        Draws all cone edges as flat projected line segments, highlights the
+        active cone and the pointed-at facet, and renders the player marker.
 
-        **Returns:**
-        Nothing.
+        Parameters
+        ----------
+        player_pos : np.ndarray
+            Unit vector in R³ giving the player's position on S².
+        player_heading : np.ndarray
+            Unit tangent vector at ``player_pos`` pointing "up".
+        current_cone : tuple[int, ...]
+            Label tuple of the cone containing the player.
+        pointed_facet : tuple[int, int] or None, optional
+            Sorted label pair of the facet the player is aiming at, or
+            ``None``.
+        locked : bool, optional
+            Whether movement is locked.
+        allow_deletion : bool, optional
+            Whether deletion mode is active.
+        color_mode : int, optional
+            Fill mode — 0 sun, 1 radius, 2 wireframe.
+        view_scale : float, optional
+            Projection scale multiplier.
+        flip_status : dict or None, optional
+            Maps each active edge to a bool indicating flippability.
+        is_irregular : bool, optional
+            Whether the current fan is irregular.
+        sphere_mode : bool, optional
+            Whether to render edges as great-circle arcs.
+        agent_active : bool, optional
+            Whether the agent is currently driving movement.
+        sun_angle : float, optional
+            Current rotation angle of the sun (radians).
+        flashlight : bool, optional
+            Whether to overlay the flashlight cone (independent of color
+            mode).
+        symbol_mode : int, optional
+            Index into the symbol ramp styles.
         """
         scr = self._stdscr
         scr.bkgd(' ', curses.color_pair(_IREG_BG_PAIR) if is_irregular else 0)
@@ -1115,7 +1196,10 @@ def _flashlight_debug_dump(
     view_scale: float,
     path: str = "/tmp/fl_debug.txt",
 ) -> str:
-    """Compute and write flashlight geometry debug info to *path*. Returns path."""
+    """Compute and write flashlight geometry debug info to *path*.
+
+    Returns the path written to.
+    """
     p      = np.asarray(player.direction, float)   # unit direction (geometry)
     p_cart = np.asarray(player.cartesian,  float)  # actual 3D position
     e1     = np.asarray(player.heading,    float)
@@ -1292,24 +1376,28 @@ def run_display_demo(
     initial_color: int = 0,
     initial_flashlight: bool = False,
 ) -> None:
-    """
-    **Description:**
-    Launch a curses demo: renders the fan with a player and waits
-    for 'q' to quit.
+    """Launch a curses demo: render the fan with a player; quit on 'q'.
 
-    **Arguments:**
-    - `fan`: A `regfans.Fan` to display.
-    - `vc`: A `regfans.VectorConfiguration` for circuit queries.
-    - `agent`: Optional agent with `.player` and `.advance(fan)`.
-      When provided the agent drives movement; arrow keys are
-      disabled and the loop runs at ~20 fps.
-    - `initial_pos`: Starting position 3-vector (normalized to direction).
-    - `initial_heading`: Starting heading 3-vector.
-    - `initial_color`: Color mode at startup (0=sun, 1=radius, 2=wireframe).
-    - `initial_flashlight`: Start with flashlight on.
-
-    **Returns:**
-    Nothing.
+    Parameters
+    ----------
+    fan : regfans.Fan
+        The fan to display.
+    vc : regfans.VectorConfiguration
+        The vector configuration used for circuit queries.
+    agent : object or None, optional
+        Optional agent with ``.player`` and ``.advance(fan)`` methods.
+        When provided the agent drives movement; arrow keys instead
+        adjust agent speed or nudge heading.
+    allow_deletion : bool, optional
+        Enable deletion mode at startup.
+    initial_pos : np.ndarray or None, optional
+        Starting position 3-vector (normalised to a direction).
+    initial_heading : np.ndarray or None, optional
+        Starting heading 3-vector.
+    initial_color : int, optional
+        Color mode at startup — 0 sun, 1 radius, 2 wireframe.
+    initial_flashlight : bool, optional
+        Start with the flashlight on.
     """
     TURN       = 0.04   # min turn rate (radians per frame at 60 fps)
     MAX_TURN   = 0.10   # max turn rate

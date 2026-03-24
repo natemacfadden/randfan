@@ -35,17 +35,37 @@ _MAX_TURN_STEP = 0.08  # max heading rotation (rad) per advance call
 
 
 class RandomAgent:
-    """
-    **Description:**
-    Navigates a player along Lévy-walk arcs on S². Arc lengths
-    are Pareto-distributed; curvatures are log-normal, centred
-    at a medium turn radius (≈ 57°) so the path is dominated
-    by smooth arcs with occasional tight or sweeping excursions.
+    """Navigates a player along Lévy-walk arcs on S².
 
-    **Attributes:**
-    - `player`: The `Player` being controlled (read-only).
-    - `alpha`: Pareto exponent for arc-length distribution.
-    - `step`: Arc length advanced per call to `advance`.
+    Arc lengths are Pareto-distributed; curvatures are log-normal, centred
+    at a medium turn radius (≈ 57°) so the path is dominated by smooth arcs
+    with occasional tight or sweeping excursions.
+
+    Parameters
+    ----------
+    player : Player
+        The ``Player`` to control.
+    alpha : float, optional
+        Pareto exponent for arc lengths. Must be > 1. Values near 1 give
+        long, wandering arcs; larger values give shorter, more uniform
+        arcs.
+    step : float, optional
+        Arc length advanced per call to ``advance`` (radians). Should
+        match the game's movement step.
+
+    Attributes
+    ----------
+    player : Player
+        The ``Player`` being controlled (read-only).
+    alpha : float
+        Pareto exponent for arc-length distribution.
+    step : float
+        Arc length advanced per call to ``advance``.
+
+    Raises
+    ------
+    ValueError
+        If ``alpha <= 1``.
     """
 
     def __init__(
@@ -54,24 +74,6 @@ class RandomAgent:
         alpha: float = 1.5,
         step:  float = 0.04,
     ) -> None:
-        """
-        **Description:**
-        Initialise the agent.
-
-        **Arguments:**
-        - `player`: The `Player` to control.
-        - `alpha`: Pareto exponent for arc lengths. Must be > 1.
-          Values near 1 give long, wandering arcs; larger values
-          give shorter, more uniform arcs.
-        - `step`: Arc length advanced per call to `advance`
-          (radians). Should match the game's movement step.
-
-        **Returns:**
-        Nothing.
-
-        **Raises:**
-        - `ValueError`: If `alpha <= 1`.
-        """
         if alpha <= 1.0:
             raise ValueError(f"alpha must be > 1, got {alpha}")
         self._player        = player
@@ -83,17 +85,17 @@ class RandomAgent:
 
     @property
     def player(self) -> Player:
-        """**Description:** The player being controlled."""
+        """The player being controlled."""
         return self._player
 
     @property
     def alpha(self) -> float:
-        """**Description:** Pareto exponent for arc-length distribution."""
+        """Pareto exponent for arc-length distribution."""
         return self._alpha
 
     @property
     def step(self) -> float:
-        """**Description:** Arc length advanced per call to `advance`."""
+        """Arc length advanced per call to ``advance``."""
         return self._step
 
     @step.setter
@@ -101,13 +103,10 @@ class RandomAgent:
         self._step = float(value)
 
     def _new_arc(self) -> None:
-        """
-        **Description:**
-        Sample a new arc segment. Arc length is Pareto-distributed;
-        curvature magnitude is log-normal with random sign.
+        """Sample a new arc segment.
 
-        **Returns:**
-        Nothing.
+        Arc length is Pareto-distributed; curvature magnitude is log-normal
+        with random sign.
         """
         self._arc_remaining = _L_MIN * (
             np.random.pareto(self._alpha - 1) + 1.0
@@ -121,17 +120,15 @@ class RandomAgent:
         )
 
     def advance(self, fan: Fan | None = None) -> None:
-        """
-        **Description:**
-        Advance the player by one step along the current arc.
+        """Advance the player by one step along the current arc.
+
         When the arc is exhausted a new one is sampled.
 
-        **Arguments:**
-        - `fan`: Optional `Fan`. Passed to `Player.move` for
-          cone-crossing detection; does not trigger flips.
-
-        **Returns:**
-        Nothing.
+        Parameters
+        ----------
+        fan : regfans.Fan or None, optional
+            Passed to ``Player.move`` for cone-crossing detection; does
+            not trigger flips.
         """
         if self._arc_remaining <= 0.0:
             self._new_arc()

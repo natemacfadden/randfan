@@ -17,19 +17,42 @@ if TYPE_CHECKING:
 
 class Player:
     """
-    **Description:**
-    A player in R³ with position stored as spherical coordinates
-    ``(r, θ, φ)`` and a unit heading in the tangent plane at the angular
-    direction ``(θ, φ)``.
+    A player in R³ with position stored as spherical coordinates.
 
-    **Attributes:**
-    - `position`: ``np.ndarray([r, θ, φ])`` — spherical coordinates.
-    - `cartesian`: ``np.ndarray([x, y, z])`` — Cartesian position, derived
-      from ``position``.
-    - `radius`: Positive scalar ``r`` — distance from the origin.
-    - `height`: Small offset above the polytope surface.
-    - `heading`: Unit tangent vector at the angular direction (perpendicular
-      to the radial direction).
+    Position is stored as ``(r, θ, φ)`` and a unit heading in the tangent
+    plane at the angular direction ``(θ, φ)``.
+
+    Parameters
+    ----------
+    position : np.ndarray
+        Non-zero 3-vector — direction used to compute ``θ, φ``.
+    heading : np.ndarray
+        Non-zero 3-vector projected onto the tangent plane at the angular
+        direction.
+    radius : float, optional
+        Initial radial distance. Defaults to 1.0.
+    height : float, optional
+        Offset above the surface. Defaults to 0.05.
+
+    Attributes
+    ----------
+    position : np.ndarray
+        ``[r, θ, φ]`` — spherical coordinates.
+    cartesian : np.ndarray
+        ``[x, y, z]`` — Cartesian position, derived from ``position``.
+    radius : float
+        Positive scalar ``r`` — distance from the origin.
+    height : float
+        Small offset above the polytope surface.
+    heading : np.ndarray
+        Unit tangent vector at the angular direction (perpendicular to the
+        radial direction).
+
+    Raises
+    ------
+    ValueError
+        If ``position`` is zero, ``heading`` is parallel to ``position``,
+        or ``radius`` is not positive.
     """
 
     # ------------------------------------------------------------------
@@ -43,23 +66,6 @@ class Player:
         radius: float = 1.0,
         height: float = 0.05,
     ) -> None:
-        """
-        **Description:**
-        Initialise a player. ``position`` is a 3-vector whose direction sets
-        ``(θ, φ)``; ``radius`` sets ``r``. When the fan is known, ``r`` is
-        updated to ``surface_radius(fan) + height`` on each ``move``.
-
-        **Arguments:**
-        - `position`: Non-zero 3-vector — direction used to compute ``θ, φ``.
-        - `heading`: Non-zero 3-vector projected onto the tangent plane at
-          the angular direction.
-        - `radius`: Initial radial distance. Defaults to 1.0.
-        - `height`: Offset above the surface. Defaults to 0.05.
-
-        **Raises:**
-        - `ValueError`: If ``position`` is zero, ``heading`` is parallel to
-          ``position``, or ``radius`` is not positive.
-        """
         position = np.asarray(position, dtype=float)
         heading  = np.asarray(heading,  dtype=float)
 
@@ -153,12 +159,12 @@ class Player:
     # ------------------------------------------------------------------
 
     def turn(self, angle: float) -> None:
-        """
-        **Description:**
-        Rotate the heading in the tangent plane. Positive turns left.
+        """Rotate the heading in the tangent plane. Positive turns left.
 
-        **Arguments:**
-        - `angle`: Rotation in radians.
+        Parameters
+        ----------
+        angle : float
+            Rotation in radians.
         """
         d = self._direction
         self._heading = (
@@ -167,16 +173,21 @@ class Player:
         )
 
     def surface_radius(self, fan: Fan) -> float:
-        """
-        **Description:**
-        Radius at which the ray from the origin through the angular direction
-        intersects the surface triangle of the current cone.
+        """Radius where the ray through the angular direction hits the surface.
 
-        **Arguments:**
-        - `fan`: A ``regfans.Fan``.
+        Returns the radius at which the ray from the origin through the
+        angular direction intersects the surface triangle of the current
+        cone.
 
-        **Returns:**
-        Positive float.
+        Parameters
+        ----------
+        fan : regfans.Fan
+            The fan defining the surface.
+
+        Returns
+        -------
+        float
+            Positive radial distance to the surface.
         """
         cone  = self.current_cone(fan)
         verts = fan.vectors(which=cone)   # shape (3, 3)
@@ -188,13 +199,22 @@ class Player:
     def move(
         self, step: float, fan: Fan | None = None,
     ) -> tuple[int, int] | None:
-        """
-        **Description:**
-        Advance along the great circle by ``step`` radians, updating ``(θ, φ)``
-        and, if ``fan`` is provided, setting ``r = surface_radius(fan) + height``.
+        """Advance along the great circle by ``step`` radians.
 
-        **Returns:**
-        Sorted label pair of the crossed facet, or ``None``.
+        Updates ``(θ, φ)`` and, if ``fan`` is provided, sets
+        ``r = surface_radius(fan) + height``.
+
+        Parameters
+        ----------
+        step : float
+            Arc length to advance in radians.
+        fan : regfans.Fan or None, optional
+            When provided, ``r`` is updated to track the surface.
+
+        Returns
+        -------
+        tuple[int, int] or None
+            Sorted label pair of the crossed facet, or ``None``.
         """
         old_cone = self.current_cone(fan) if fan is not None else None
 
@@ -231,13 +251,17 @@ class Player:
     # ------------------------------------------------------------------
 
     def pointed_facet(self, fan: Fan) -> tuple[int, int] | None:
-        """
-        **Description:**
-        Return the facet of the current cone that the heading aims most
-        directly toward.
+        """Return the facet the heading aims most directly toward.
 
-        **Returns:**
-        Sorted label pair ``(min, max)``, or ``None``.
+        Parameters
+        ----------
+        fan : regfans.Fan
+            The fan defining the cone structure.
+
+        Returns
+        -------
+        tuple[int, int] or None
+            Sorted label pair ``(min, max)``, or ``None``.
         """
         cone = self.current_cone(fan)
         i, j, k = cone
@@ -261,13 +285,22 @@ class Player:
         return best_facet
 
     def current_cone(self, fan: Fan) -> tuple[int, ...]:
-        """
-        **Description:**
-        Return the label tuple of the cone containing the player's angular
-        direction.
+        """Return the label tuple of the cone containing the player's direction.
 
-        **Raises:**
-        - `ValueError`: If no cone contains the direction.
+        Parameters
+        ----------
+        fan : regfans.Fan
+            The fan to search.
+
+        Returns
+        -------
+        tuple[int, ...]
+            Label tuple of the containing cone.
+
+        Raises
+        ------
+        ValueError
+            If no cone contains the direction.
         """
         d = self._direction
         for cone in fan.cones():
@@ -284,10 +317,22 @@ class Player:
         new_cone: tuple[int, ...],
         fan: Fan,
     ) -> object | None:
-        """
-        **Description:**
-        Find the circuit in ``fan`` whose support is the union of ``old_cone``
-        and ``new_cone``.
+        """Find the circuit whose support is the union of ``old_cone`` and
+        ``new_cone``.
+
+        Parameters
+        ----------
+        old_cone : tuple[int, ...]
+            Label tuple of the cone before crossing.
+        new_cone : tuple[int, ...]
+            Label tuple of the cone after crossing.
+        fan : regfans.Fan
+            The fan containing the circuits.
+
+        Returns
+        -------
+        object or None
+            The matching circuit, or ``None`` if not found.
         """
         target = set(old_cone) | set(new_cone)
         for circ in fan.circuits():
@@ -301,9 +346,21 @@ class Player:
         new_cone: tuple[int, ...],
         vc: VectorConfiguration,
     ) -> object | None:
-        """
-        **Description:**
-        Return the Circuit for the wall crossing, or ``None`` if degenerate.
+        """Return the circuit for the wall crossing, or ``None`` if degenerate.
+
+        Parameters
+        ----------
+        old_cone : tuple[int, ...]
+            Label tuple of the cone before crossing.
+        new_cone : tuple[int, ...]
+            Label tuple of the cone after crossing.
+        vc : regfans.VectorConfiguration
+            The vector configuration to query.
+
+        Returns
+        -------
+        object or None
+            The circuit, or ``None`` if degenerate/coplanar.
         """
         shared = set(old_cone) & set(new_cone)
         c = (set(old_cone) - shared).pop()

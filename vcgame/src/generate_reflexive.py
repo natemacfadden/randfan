@@ -27,11 +27,25 @@ N_POLYTOPES  = 4319   # polytope ids 0 … 4318
 
 
 def _fetch_vectors(polytope_id: int) -> list[list[int]]:
-    """
-    Fetch the non-origin lattice points of polytope *polytope_id* from
-    the Coates–Corti–Galkin–Golyshev–Kasprzyk database.
+    """Fetch non-origin lattice points of a polytope from the CCGGK database.
 
-    Returns a list of integer 3-vectors.
+    Retrieves data for ``polytope_id`` from the
+    Coates–Corti–Galkin–Golyshev–Kasprzyk database.
+
+    Parameters
+    ----------
+    polytope_id : int
+        Polytope index in [0, 4318].
+
+    Returns
+    -------
+    list[list[int]]
+        A list of integer 3-vectors (origin excluded).
+
+    Raises
+    ------
+    ValueError
+        If ``polytope_id`` is out of range or the page cannot be parsed.
     """
     if not 0 <= polytope_id < N_POLYTOPES:
         raise ValueError(
@@ -88,24 +102,32 @@ def _fetch_vectors(polytope_id: int) -> list[list[int]]:
 
 
 def reflexive_vc(polytope_id: int = 0) -> VectorConfiguration:
-    """
-    **Description:**
-    Return the VectorConfiguration of non-origin lattice points of the
-    given 3D reflexive polytope.
+    """Return the VectorConfiguration of a 3D reflexive polytope.
 
-    **Returns:**
-    A VectorConfiguration.
+    Parameters
+    ----------
+    polytope_id : int, optional
+        Polytope index in [0, 4318]. Defaults to 0.
+
+    Returns
+    -------
+    VectorConfiguration
+        The vector configuration of non-origin lattice points.
     """
     return VectorConfiguration(_fetch_vectors(polytope_id))
 
 
 def reflexive_fan(polytope_id: int = 0) -> Fan:
-    """
-    **Description:**
-    Return a triangulated fan from the non-origin lattice points of the
-    given 3D reflexive polytope.
+    """Return a triangulated fan from a 3D reflexive polytope.
 
-    **Returns:**
-    A Fan.
+    Parameters
+    ----------
+    polytope_id : int, optional
+        Polytope index in [0, 4318]. Defaults to 0.
+
+    Returns
+    -------
+    Fan
+        A triangulated fan of the non-origin lattice points.
     """
     return reflexive_vc(polytope_id).triangulate()

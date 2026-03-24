@@ -20,13 +20,14 @@ if TYPE_CHECKING:
 
 
 def trunc_oct_vectors() -> list[list[int]]:
-    """
-    **Description:**
-    Return the 24 vertices of the truncated octahedron: all
-    distinct permutations of (0, ±1, ±2).
+    """Return the 24 vertices of the truncated octahedron.
 
-    **Returns:**
-    A list of 24 integer 3-vectors.
+    Returns all distinct permutations of (0, ±1, ±2).
+
+    Returns
+    -------
+    list[list[int]]
+        A list of 24 integer 3-vectors.
     """
     pts: set[tuple[int, ...]] = set()
     for p in permutations([0, 1, 2]):
@@ -37,24 +38,22 @@ def trunc_oct_vectors() -> list[list[int]]:
 
 
 def trunc_oct_vc() -> VectorConfiguration:
-    """
-    **Description:**
-    Return the VectorConfiguration of the truncated octahedron
-    vertices.
+    """Return the VectorConfiguration of the truncated octahedron vertices.
 
-    **Returns:**
-    A VectorConfiguration.
+    Returns
+    -------
+    VectorConfiguration
+        The vector configuration of the 24 truncated octahedron vertices.
     """
     return VectorConfiguration(trunc_oct_vectors())
 
 
 def trunc_oct_fan() -> Fan:
-    """
-    **Description:**
-    Return a triangulation of the truncated octahedron vector
-    configuration.
+    """Return a triangulation of the truncated octahedron vector configuration.
 
-    **Returns:**
-    A Fan.
+    Returns
+    -------
+    Fan
+        A triangulated fan of the truncated octahedron vertices.
     """
     return VectorConfiguration(trunc_oct_vectors()).triangulate()

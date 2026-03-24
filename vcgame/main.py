@@ -12,7 +12,8 @@ from src.display import run_display_demo
 
 def _fix_negative_args() -> None:
     """Join --pos/--heading with their value using '=' so argparse doesn't
-    mistake a leading '-' in the value for a flag."""
+    mistake a leading '-' in the value for a flag.
+    """
     _vec_flags = {"--pos", "--heading"}
     argv = sys.argv
     fixed = [argv[0]]

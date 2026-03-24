@@ -14,17 +14,21 @@ if TYPE_CHECKING:
 
 
 def cube_vectors(n: int) -> list[list[int]]:
-    """
-    **Description:**
-    Return the boundary lattice points of an n x n x n integer cube, centered
-    at the origin. Boundary points are those with at least one coordinate equal
-    to ±(n-1)/2. The origin (interior center) is excluded.
+    """Return the boundary lattice points of an n x n x n integer cube.
 
-    **Arguments:**
-    - `n`: Grid size. Must be odd and >= 3.
+    The cube is centered at the origin. Boundary points are those with at
+    least one coordinate equal to ±(n-1)/2. The origin (interior center)
+    is excluded.
 
-    **Returns:**
-    A list of integer 3-vectors.
+    Parameters
+    ----------
+    n : int
+        Grid size. Must be odd and >= 3.
+
+    Returns
+    -------
+    list[list[int]]
+        A list of integer 3-vectors.
     """
     if n % 2 == 0 or n < 3:
         raise ValueError(f"n must be odd and >= 3, got {n}")
@@ -39,29 +43,32 @@ def cube_vectors(n: int) -> list[list[int]]:
 
 
 def cube_vc(n: int) -> VectorConfiguration:
-    """
-    **Description:**
-    Return the VectorConfiguration of the n x n x n cube boundary
-    lattice points.
+    """Return the VectorConfiguration of the n x n x n cube boundary points.
 
-    **Arguments:**
-    - `n`: Grid size. Must be odd and >= 3.
+    Parameters
+    ----------
+    n : int
+        Grid size. Must be odd and >= 3.
 
-    **Returns:**
-    A VectorConfiguration.
+    Returns
+    -------
+    VectorConfiguration
+        The vector configuration of the boundary lattice points.
     """
     return VectorConfiguration(cube_vectors(n))
 
 
 def cube_fan(n: int) -> Fan:
-    """
-    **Description:**
-    Return a triangulation of the n x n x n cube vector configuration.
+    """Return a triangulation of the n x n x n cube vector configuration.
 
-    **Arguments:**
-    - `n`: Grid size. Must be odd and >= 3.
+    Parameters
+    ----------
+    n : int
+        Grid size. Must be odd and >= 3.
 
-    **Returns:**
-    A Fan.
+    Returns
+    -------
+    Fan
+        A triangulated fan of the cube boundary lattice points.
     """
     return VectorConfiguration(cube_vectors(n)).triangulate()

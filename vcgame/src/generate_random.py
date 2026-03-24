@@ -24,10 +24,22 @@ def _surface_lattice_points(
     pts: list[list[int]],
     hull: ConvexHull,
 ) -> list[list[int]]:
-    """
-    Return every non-origin integer point that lies on the surface of
-    `hull`.  For each facet plane we enumerate candidate integer points
-    and keep those that satisfy all hull inequalities.
+    """Return every non-origin integer point on the surface of ``hull``.
+
+    For each facet plane, enumerate candidate integer points and keep those
+    that satisfy all hull inequalities.
+
+    Parameters
+    ----------
+    pts : list[list[int]]
+        Integer points used to build the hull.
+    hull : scipy.spatial.ConvexHull
+        Convex hull of ``pts``.
+
+    Returns
+    -------
+    list[list[int]]
+        Non-origin integer 3-vectors lying on the hull surface.
     """
     arr = np.array(pts, dtype=float)
     lo  = np.floor(arr.min(axis=0)).astype(int)
@@ -72,20 +84,26 @@ def random_vectors(
     n_pairs:   int = 6,
     max_coord: int = 3,
 ) -> list[list[int]]:
-    """
-    **Description:**
-    Sample `n_pairs` random non-zero integer vectors in
-    [−max_coord, max_coord]³ together with their negatives, compute
-    the convex hull, and return all non-origin lattice points on the
-    hull surface.
+    """Sample random centrally-symmetric vectors and return hull surface points.
 
-    **Arguments:**
-    - `seed`: RNG seed (default 1102).
-    - `n_pairs`: Number of (v, −v) pairs to seed the hull with.
-    - `max_coord`: Coordinate range (inclusive).
+    Samples ``n_pairs`` random non-zero integer vectors in
+    [−max_coord, max_coord]³ together with their negatives, computes the
+    convex hull, and returns all non-origin lattice points on the hull
+    surface.
 
-    **Returns:**
-    A list of integer 3-vectors.
+    Parameters
+    ----------
+    seed : int, optional
+        RNG seed. Defaults to 1102.
+    n_pairs : int, optional
+        Number of (v, −v) pairs to seed the hull with.
+    max_coord : int, optional
+        Coordinate range (inclusive).
+
+    Returns
+    -------
+    list[list[int]]
+        A list of integer 3-vectors.
     """
     rng  = np.random.default_rng(seed)
     seen: set[tuple[int, ...]] = set()
@@ -109,13 +127,21 @@ def random_vc(
     n_pairs:   int = 6,
     max_coord: int = 3,
 ) -> VectorConfiguration:
-    """
-    **Description:**
-    Return the VectorConfiguration of lattice points on the convex hull
-    of random centrally-symmetric lattice points.
+    """Return the VectorConfiguration of random centrally-symmetric hull points.
 
-    **Returns:**
-    A VectorConfiguration.
+    Parameters
+    ----------
+    seed : int, optional
+        RNG seed. Defaults to 1102.
+    n_pairs : int, optional
+        Number of (v, −v) pairs to seed the hull with.
+    max_coord : int, optional
+        Coordinate range (inclusive).
+
+    Returns
+    -------
+    VectorConfiguration
+        The vector configuration of hull surface lattice points.
     """
     return VectorConfiguration(random_vectors(seed, n_pairs, max_coord))
 
@@ -125,12 +151,20 @@ def random_fan(
     n_pairs:   int = 6,
     max_coord: int = 3,
 ) -> Fan:
-    """
-    **Description:**
-    Return a triangulated fan from lattice points on the convex hull of
-    random centrally-symmetric lattice points.
+    """Return a triangulated fan from random centrally-symmetric hull points.
 
-    **Returns:**
-    A Fan.
+    Parameters
+    ----------
+    seed : int, optional
+        RNG seed. Defaults to 1102.
+    n_pairs : int, optional
+        Number of (v, −v) pairs to seed the hull with.
+    max_coord : int, optional
+        Coordinate range (inclusive).
+
+    Returns
+    -------
+    Fan
+        A triangulated fan of the hull surface lattice points.
     """
     return random_vc(seed, n_pairs, max_coord).triangulate()
