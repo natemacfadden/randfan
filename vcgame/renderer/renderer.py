@@ -281,7 +281,7 @@ def _fill_triangle(
                 vl, vr = vr, vl
         left  = int(round(cl))
         right = int(round(cr))
-        for c in range(max(0, left), min(cols - 1, right + 1)):
+        for c in range(max(0, left), min(cols - 2, right) + 1):
             if shade_fn is not None and face_normal is not None and vl is not None:
                 tc    = (c - left) / (right - left) if right > left else 0.0
                 pos   = vl + tc * (vr - vl)
