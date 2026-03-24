@@ -1,4 +1,4 @@
-"""Tests for src/display.py (pure functions only — no curses)."""
+"""Tests for renderer/ (pure functions only — no curses)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
-from src.display import _cone_edge_map, _project, _viridis_rgb
+from renderer.renderer import _cone_edge_map, _project
+from renderer.colors import _viridis_rgb
 
 if TYPE_CHECKING:
     from regfans import Fan

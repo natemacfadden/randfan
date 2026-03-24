@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from src.generate_cube import cube_fan, cube_vc
+from shapes.cube import cube_fan, cube_vc
 
 if TYPE_CHECKING:
     from regfans import Fan, VectorConfiguration

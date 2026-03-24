@@ -7,7 +7,7 @@ import sys
 
 import numpy as np
 
-from src.display import run_display_demo
+from game import run_display_demo
 
 
 def _parse_vec_arg(s: str) -> np.ndarray:
@@ -115,30 +115,21 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     _fix_negative_args()
     args = _parse_args()
-    if args.shape == "trunc_oct":
-        from src.generate_trunc_oct import trunc_oct_fan, trunc_oct_vc
-        fan = trunc_oct_fan()
-        vc  = trunc_oct_vc()
-    elif args.shape == "random":
-        from src.generate_random import random_fan, random_vc
-        fan = random_fan(seed=args.seed)
-        vc  = random_vc(seed=args.seed)
-    elif args.shape == "reflexive":
-        from src.generate_reflexive import reflexive_fan, reflexive_vc
-        fan = reflexive_fan(polytope_id=args.polytope)
-        vc  = reflexive_vc(polytope_id=args.polytope)
-    else:
-        from src.generate_cube import cube_fan, cube_vc
-        fan = cube_fan(3)
-        vc  = cube_vc(3)
+
+    from shapes import load_shape
+    fan, vc = load_shape(
+        args.shape,
+        seed=args.seed,
+        polytope_id=args.polytope,
+    )
 
     initial_pos       = _parse_vec_arg(args.pos)     if args.pos     else None
     initial_heading   = _parse_vec_arg(args.heading) if args.heading else None
 
     agent = None
     if args.levy:
-        from agents.random_agent import RandomAgent
-        from src.player import Player
+        from game.agents.random_agent import RandomAgent
+        from game.player import Player
         pos0 = initial_pos   if initial_pos   is not None else [1.0, 0.2, 0.1]
         hdg0 = initial_heading if initial_heading is not None else [0.0, 1.0, 0.0]
         player = Player(pos0, hdg0)

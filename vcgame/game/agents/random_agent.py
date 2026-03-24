@@ -24,8 +24,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
+    from ..player import Player
     from regfans import Fan
-    from src.player import Player
 
 
 _L_MIN        = 0.2   # minimum arc length (radians)

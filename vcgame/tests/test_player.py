@@ -1,4 +1,4 @@
-"""Tests for src/player.py"""
+"""Tests for game/player.py"""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
-from src.player import Player
+from game.player import Player
 
 if TYPE_CHECKING:
     from regfans import Fan, VectorConfiguration

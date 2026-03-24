@@ -1,4 +1,4 @@
-"""Tests for src/generate_cube.py"""
+"""Tests for shapes/cube.py"""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from src.generate_cube import cube_fan, cube_vc, cube_vectors
+from shapes.cube import cube_fan, cube_vc, cube_vectors
 
 if TYPE_CHECKING:
     from regfans import Fan
