@@ -16,7 +16,7 @@ import json
 from . import _SHAPES, get_vectors
 
 
-def _parse_args() -> argparse.Namespace:
+def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="python -m shapes",
         description="Print integer vectors for a named shape as JSON.",
@@ -29,9 +29,9 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument(
         "--n",
         type=int,
-        default=3,
+        default=None,
         metavar="N",
-        help="Cube grid size (odd, >= 3). Only used for 'cube'. Default: 3.",
+        help="Cube grid size (odd, >= 3). Required for 'cube'.",
     )
     p.add_argument(
         "--seed",
@@ -47,14 +47,18 @@ def _parse_args() -> argparse.Namespace:
         metavar="ID",
         help="Reflexive polytope index 0–4318. Only used for 'reflexive'.",
     )
-    return p.parse_args()
+    return p
 
 
 def main() -> None:
-    args = _parse_args()
+    p = _build_parser()
+    args = p.parse_args()
+    if args.shape == "cube" and args.n is None:
+        p.error("--n is required for 'cube'")
+
     vectors = get_vectors(
         args.shape,
-        n=args.n,
+        n=args.n if args.n is not None else 3,
         seed=args.seed,
         polytope_id=args.polytope_id,
     )
