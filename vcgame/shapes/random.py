@@ -1,6 +1,6 @@
 """
-Generate a vector configuration from lattice points on the surface of
-the convex hull of a set of random centrally-symmetric lattice points.
+Generate integer vectors from the surface of the convex hull of a set
+of random centrally-symmetric lattice points.
 
 Central symmetry (for every sampled v, -v is also included) guarantees
 the origin is strictly inside the hull, so the resulting vectors span
@@ -9,15 +9,8 @@ all of R³ and the triangulated fan is complete.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import numpy as np
 from scipy.spatial import ConvexHull
-
-from regfans import VectorConfiguration
-
-if TYPE_CHECKING:
-    from regfans import Fan
 
 _LATTICE_TOL = 1e-6
 
@@ -78,7 +71,7 @@ def _surface_lattice_points(
                     if pt != (0, 0, 0):
                         result.add(pt)
 
-    return [list(p) for p in result]
+    return [list(p) for p in sorted(result)]
 
 
 def random_vectors(
@@ -98,15 +91,25 @@ def random_vectors(
     seed : int, optional
         RNG seed. Defaults to 1102.
     n_pairs : int, optional
-        Number of (v, −v) pairs to seed the hull with.
+        Number of (v, −v) pairs to seed the hull with. Must be >= 1.
     max_coord : int, optional
-        Coordinate range (inclusive).
+        Coordinate range (inclusive). Must be >= 1.
 
     Returns
     -------
     list[list[int]]
         A list of integer 3-vectors.
+
+    Raises
+    ------
+    ValueError
+        If ``n_pairs`` < 1 or ``max_coord`` < 1.
     """
+    if n_pairs < 1:
+        raise ValueError(f"n_pairs must be >= 1, got {n_pairs}")
+    if max_coord < 1:
+        raise ValueError(f"max_coord must be >= 1, got {max_coord}")
+
     rng  = np.random.default_rng(seed)
     seen: set[tuple[int, ...]] = set()
 
@@ -122,51 +125,3 @@ def random_vectors(
     pts  = [list(p) for p in seen]
     hull = ConvexHull(pts)
     return _surface_lattice_points(pts, hull)
-
-
-def random_vc(
-    seed:      int = 1102,
-    n_pairs:   int = 6,
-    max_coord: int = 3,
-) -> VectorConfiguration:
-    """Return the VectorConfiguration of random centrally-symmetric hull points.
-
-    Parameters
-    ----------
-    seed : int, optional
-        RNG seed. Defaults to 1102.
-    n_pairs : int, optional
-        Number of (v, −v) pairs to seed the hull with.
-    max_coord : int, optional
-        Coordinate range (inclusive).
-
-    Returns
-    -------
-    VectorConfiguration
-        The vector configuration of hull surface lattice points.
-    """
-    return VectorConfiguration(random_vectors(seed, n_pairs, max_coord))
-
-
-def random_fan(
-    seed:      int = 1102,
-    n_pairs:   int = 6,
-    max_coord: int = 3,
-) -> Fan:
-    """Return a triangulated fan from random centrally-symmetric hull points.
-
-    Parameters
-    ----------
-    seed : int, optional
-        RNG seed. Defaults to 1102.
-    n_pairs : int, optional
-        Number of (v, −v) pairs to seed the hull with.
-    max_coord : int, optional
-        Coordinate range (inclusive).
-
-    Returns
-    -------
-    Fan
-        A triangulated fan of the hull surface lattice points.
-    """
-    return random_vc(seed, n_pairs, max_coord).triangulate()

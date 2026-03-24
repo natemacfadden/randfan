@@ -27,50 +27,30 @@ def _all_shapes_vectors():
 # get_vectors — shared structural checks (all non-network shapes)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("vectors", [
-    get_vectors("cube", n=3),
-    get_vectors("random", seed=1102),
-    get_vectors("trunc_oct"),
-])
+@pytest.mark.parametrize("vectors", _all_shapes_vectors())
 def test_output_type(vectors):
     assert isinstance(vectors, list)
     assert all(isinstance(v, list) for v in vectors)
 
 
-@pytest.mark.parametrize("vectors", [
-    get_vectors("cube", n=3),
-    get_vectors("random", seed=1102),
-    get_vectors("trunc_oct"),
-])
+@pytest.mark.parametrize("vectors", _all_shapes_vectors())
 def test_vector_dimension(vectors):
     assert all(len(v) == 3 for v in vectors)
 
 
-@pytest.mark.parametrize("vectors", [
-    get_vectors("cube", n=3),
-    get_vectors("random", seed=1102),
-    get_vectors("trunc_oct"),
-])
+@pytest.mark.parametrize("vectors", _all_shapes_vectors())
 def test_integer_values(vectors):
     for v in vectors:
         assert all(isinstance(x, int) for x in v)
 
 
-@pytest.mark.parametrize("vectors", [
-    get_vectors("cube", n=3),
-    get_vectors("random", seed=1102),
-    get_vectors("trunc_oct"),
-])
+@pytest.mark.parametrize("vectors", _all_shapes_vectors())
 def test_no_duplicates(vectors):
     tuples = [tuple(v) for v in vectors]
     assert len(tuples) == len(set(tuples))
 
 
-@pytest.mark.parametrize("vectors", [
-    get_vectors("cube", n=3),
-    get_vectors("random", seed=1102),
-    get_vectors("trunc_oct"),
-])
+@pytest.mark.parametrize("vectors", _all_shapes_vectors())
 def test_no_origin(vectors):
     assert [0, 0, 0] not in vectors
 
@@ -108,14 +88,10 @@ def test_cube_count(n, expected_count):
     assert len(cube_vectors(n)) == expected_count
 
 
-@pytest.mark.parametrize("n, expected_count", [
-    (3,  26),
-    (5,  98),
-    (7, 218),
-])
-def test_cube_count_formula(n, expected_count):
+@pytest.mark.parametrize("n", [3, 5, 7])
+def test_cube_count_formula(n):
     """Count matches n^3 - (n-2)^3."""
-    assert expected_count == n**3 - (n - 2)**3
+    assert len(cube_vectors(n)) == n**3 - (n - 2)**3
 
 
 @pytest.mark.parametrize("n", [3, 5, 7])
@@ -161,9 +137,6 @@ def test_random_different_seeds_differ():
 # ---------------------------------------------------------------------------
 # reflexive (requires network)
 # ---------------------------------------------------------------------------
-
-pytestmark_network = pytest.mark.network
-
 
 _REFLEXIVE_EXPECTED = {
     0: [[1, 0, 0], [0, 1, 0], [0, 0, 1], [-1, -1, -1]],

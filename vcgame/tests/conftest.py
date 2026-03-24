@@ -6,20 +6,22 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from shapes.cube import cube_fan, cube_vc
+from regfans import VectorConfiguration
+from shapes import vectors_to_fan
+from shapes.cube import cube_vectors
 
 if TYPE_CHECKING:
-    from regfans import Fan, VectorConfiguration
+    from regfans import Fan
 
 
 @pytest.fixture(scope="session")
 def fan3() -> Fan:
-    return cube_fan(3)
+    return vectors_to_fan(cube_vectors(3))
 
 
 @pytest.fixture(scope="session")
 def vc3() -> VectorConfiguration:
-    return cube_vc(3)
+    return VectorConfiguration(cube_vectors(3))
 
 
 @pytest.fixture(scope="session")

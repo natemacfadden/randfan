@@ -58,7 +58,7 @@ def main() -> None:
 
     vectors = get_vectors(
         args.shape,
-        n=args.n if args.n is not None else 3,
+        n=args.n,
         seed=args.seed,
         polytope_id=args.polytope_id,
     )

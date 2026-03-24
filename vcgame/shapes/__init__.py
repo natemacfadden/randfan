@@ -15,7 +15,13 @@ if TYPE_CHECKING:
     from regfans import Fan
 
 
-_SHAPES = ("cube", "random", "reflexive", "trunc_oct")
+_REGISTRY: dict[str, object] = {
+    "cube":      lambda **kw: cube_vectors(kw["n"]),
+    "random":    lambda **kw: random_vectors(seed=kw["seed"]),
+    "reflexive": lambda **kw: reflexive_vectors(polytope_id=kw["polytope_id"]),
+    "trunc_oct": lambda **kw: trunc_oct_vectors(),
+}
+_SHAPES = tuple(_REGISTRY)
 
 
 def get_vectors(
@@ -48,17 +54,11 @@ def get_vectors(
     ValueError
         If ``name`` is not a recognised shape.
     """
-    if name == "cube":
-        return cube_vectors(n)
-    if name == "random":
-        return random_vectors(seed=seed)
-    if name == "reflexive":
-        return reflexive_vectors(polytope_id=polytope_id)
-    if name == "trunc_oct":
-        return trunc_oct_vectors()
-    raise ValueError(
-        f"Unknown shape {name!r}. Choose from: {', '.join(_SHAPES)}"
-    )
+    if name not in _REGISTRY:
+        raise ValueError(
+            f"Unknown shape {name!r}. Choose from: {', '.join(_SHAPES)}"
+        )
+    return _REGISTRY[name](n=n, seed=seed, polytope_id=polytope_id)
 
 
 def vectors_to_fan(vectors: list[list[int]]) -> Fan:
@@ -102,4 +102,6 @@ def load_shape(
     Fan
         A triangulated fan.
     """
-    return vectors_to_fan(get_vectors(name, seed=seed, polytope_id=polytope_id, n=n))
+    return vectors_to_fan(
+        get_vectors(name, seed=seed, polytope_id=polytope_id, n=n)
+    )

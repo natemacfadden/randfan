@@ -1,6 +1,5 @@
 """
-Generate a vector configuration from the lattice points of a 3D
-reflexive polytope.
+Generate integer vectors from the lattice points of a 3D reflexive polytope.
 
 Data source: http://coates.ma.ic.ac.uk/3DReflexivePolytopes/
 There are 4319 polytopes, indexed 0–4318.
@@ -14,39 +13,38 @@ columns are used as vectors.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
 from urllib.error import URLError
 from urllib.request import urlopen
 
-from regfans import VectorConfiguration
-
-if TYPE_CHECKING:
-    from regfans import Fan
-
-_BASE_URL    = "http://coates.ma.ic.ac.uk/3DReflexivePolytopes/{}.html"
-N_POLYTOPES  = 4319   # polytope ids 0 … 4318
+_BASE_URL   = "http://coates.ma.ic.ac.uk/3DReflexivePolytopes/{}.html"
+N_POLYTOPES = 4319   # polytope ids 0 … 4318
 
 
-def _fetch_vectors(polytope_id: int) -> list[list[int]]:
-    """Fetch non-origin lattice points of a polytope from the CCGGK database.
+class ReflexiveFetchError(OSError):
+    """Raised when the polytope database cannot be reached."""
 
-    Retrieves data for ``polytope_id`` from the
-    Coates–Corti–Galkin–Golyshev–Kasprzyk database.
+
+def reflexive_vectors(polytope_id: int = 0) -> list[list[int]]:
+    """Return non-origin lattice points of a 3D reflexive polytope.
+
+    Fetches data from the Coates–Corti–Galkin–Golyshev–Kasprzyk database.
 
     Parameters
     ----------
-    polytope_id : int
-        Polytope index in [0, 4318].
+    polytope_id : int, optional
+        Polytope index in [0, 4318]. Defaults to 0.
 
     Returns
     -------
     list[list[int]]
-        A list of integer 3-vectors (origin excluded).
+        Non-origin integer lattice points.
 
     Raises
     ------
     ValueError
         If ``polytope_id`` is out of range or the page cannot be parsed.
+    ReflexiveFetchError
+        If the database cannot be reached (network error).
     """
     if not 0 <= polytope_id < N_POLYTOPES:
         raise ValueError(
@@ -58,11 +56,11 @@ def _fetch_vectors(polytope_id: int) -> list[list[int]]:
         with urlopen(url, timeout=15) as resp:
             html = resp.read().decode("utf-8")
     except URLError as exc:
-        raise ValueError(
-            f"Failed to fetch reflexive polytope {polytope_id}: {exc}"
+        raise ReflexiveFetchError(
+            f"Could not reach reflexive polytope database "
+            f"(polytope_id={polytope_id}): {exc}"
         ) from exc
 
-    # Locate the value cell that follows a cell containing "Integer points".
     match = re.search(
         r"Integer\s+points.*?<td[^>]*>(.*?)</td>",
         html,
@@ -105,51 +103,3 @@ def _fetch_vectors(polytope_id: int) -> list[list[int]]:
             vectors.append(pt)
 
     return vectors
-
-
-def reflexive_vectors(polytope_id: int = 0) -> list[list[int]]:
-    """Return integer lattice points for a 3D reflexive polytope.
-
-    Parameters
-    ----------
-    polytope_id : int, optional
-        Polytope index in [0, 4318]. Defaults to 0.
-
-    Returns
-    -------
-    list[list[int]]
-        Non-origin integer lattice points.
-    """
-    return _fetch_vectors(polytope_id)
-
-
-def reflexive_vc(polytope_id: int = 0) -> VectorConfiguration:
-    """Return the VectorConfiguration of a 3D reflexive polytope.
-
-    Parameters
-    ----------
-    polytope_id : int, optional
-        Polytope index in [0, 4318]. Defaults to 0.
-
-    Returns
-    -------
-    VectorConfiguration
-        The vector configuration of non-origin lattice points.
-    """
-    return VectorConfiguration(_fetch_vectors(polytope_id))
-
-
-def reflexive_fan(polytope_id: int = 0) -> Fan:
-    """Return a triangulated fan from a 3D reflexive polytope.
-
-    Parameters
-    ----------
-    polytope_id : int, optional
-        Polytope index in [0, 4318]. Defaults to 0.
-
-    Returns
-    -------
-    Fan
-        A triangulated fan of the non-origin lattice points.
-    """
-    return reflexive_vc(polytope_id).triangulate()

@@ -1,16 +1,9 @@
 """
-Generate a vector configuration and triangulation from the boundary lattice
-points of an n x n x n integer cube.
+Generate integer vectors from the boundary lattice points of an
+n x n x n integer cube.
 """
 
 from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
-from regfans import VectorConfiguration
-
-if TYPE_CHECKING:
-    from regfans import Fan
 
 
 def cube_vectors(n: int) -> list[list[int]]:
@@ -40,35 +33,3 @@ def cube_vectors(n: int) -> list[list[int]]:
         for z in range(n)
         if x == 0 or x == n-1 or y == 0 or y == n-1 or z == 0 or z == n-1
     ]
-
-
-def cube_vc(n: int) -> VectorConfiguration:
-    """Return the VectorConfiguration of the n x n x n cube boundary points.
-
-    Parameters
-    ----------
-    n : int
-        Grid size. Must be odd and >= 3.
-
-    Returns
-    -------
-    VectorConfiguration
-        The vector configuration of the boundary lattice points.
-    """
-    return VectorConfiguration(cube_vectors(n))
-
-
-def cube_fan(n: int) -> Fan:
-    """Return a triangulation of the n x n x n cube vector configuration.
-
-    Parameters
-    ----------
-    n : int
-        Grid size. Must be odd and >= 3.
-
-    Returns
-    -------
-    Fan
-        A triangulated fan of the cube boundary lattice points.
-    """
-    return VectorConfiguration(cube_vectors(n)).triangulate()

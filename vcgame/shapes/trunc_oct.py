@@ -1,6 +1,6 @@
 """
-Generate a vector configuration and triangulation from the
-vertices of the truncated octahedron (permutohedron).
+Generate integer vectors from the vertices of the truncated octahedron
+(permutohedron).
 
 The 24 vertices are all distinct points of the form (0, ±1, ±2)
 and its permutations. The shape tiles R³ by translation, has 36
@@ -10,13 +10,7 @@ richer fan structure than the cube.
 
 from __future__ import annotations
 
-from itertools import permutations, product
-from typing import TYPE_CHECKING
-
-from regfans import VectorConfiguration
-
-if TYPE_CHECKING:
-    from regfans import Fan
+from itertools import permutations
 
 
 def trunc_oct_vectors() -> list[list[int]]:
@@ -29,31 +23,14 @@ def trunc_oct_vectors() -> list[list[int]]:
     list[list[int]]
         A list of 24 integer 3-vectors.
     """
+    # Generate all permutations of (0,1,2) with all sign combinations.
+    # Applying signs to the zero component produces duplicates (e.g.
+    # (-1)*0 == 0), so the set deduplicates down to exactly 24 points.
     pts: set[tuple[int, ...]] = set()
-    for p in permutations([0, 1, 2]):
-        for signs in product((-1, 1), repeat=3):
-            pts.add(tuple(s * c for s, c in zip(signs, p)))
+    for a, b, c in permutations([0, 1, 2]):
+        for sb in (-1, 1):
+            for sc in (-1, 1):
+                pts.add((a, sb * b, sc * c))
+                pts.add((-a, sb * b, sc * c))
     pts.discard((0, 0, 0))
     return [list(p) for p in sorted(pts)]
-
-
-def trunc_oct_vc() -> VectorConfiguration:
-    """Return the VectorConfiguration of the truncated octahedron vertices.
-
-    Returns
-    -------
-    VectorConfiguration
-        The vector configuration of the 24 truncated octahedron vertices.
-    """
-    return VectorConfiguration(trunc_oct_vectors())
-
-
-def trunc_oct_fan() -> Fan:
-    """Return a triangulation of the truncated octahedron vector configuration.
-
-    Returns
-    -------
-    Fan
-        A triangulated fan of the truncated octahedron vertices.
-    """
-    return VectorConfiguration(trunc_oct_vectors()).triangulate()
