@@ -1,18 +1,31 @@
 """Shape/vector-configuration generation."""
-from .cube import cube_fan, cube_vc
-from .random import random_fan, random_vc
-from .reflexive import reflexive_fan, reflexive_vc
-from .trunc_oct import trunc_oct_fan, trunc_oct_vc
+from __future__ import annotations
+
+import json
+from typing import TYPE_CHECKING
+
+from regfans import VectorConfiguration
+
+from .cube import cube_vectors
+from .random import random_vectors
+from .reflexive import reflexive_vectors
+from .trunc_oct import trunc_oct_vectors
+
+if TYPE_CHECKING:
+    from regfans import Fan
 
 
-def load_shape(
+_SHAPES = ("cube", "random", "reflexive", "trunc_oct")
+
+
+def get_vectors(
     name: str,
     *,
     seed: int = 1102,
     polytope_id: int = 0,
     n: int = 3,
-):
-    """Load a fan and vector configuration by name.
+) -> list[list[int]]:
+    """Return integer vectors for the named shape.
 
     Parameters
     ----------
@@ -27,8 +40,8 @@ def load_shape(
 
     Returns
     -------
-    tuple
-        ``(fan, vc)`` pair.
+    list[list[int]]
+        Integer 3-vectors on the polytope boundary.
 
     Raises
     ------
@@ -36,13 +49,57 @@ def load_shape(
         If ``name`` is not a recognised shape.
     """
     if name == "cube":
-        return cube_fan(n), cube_vc(n)
+        return cube_vectors(n)
     if name == "random":
-        return random_fan(seed=seed), random_vc(seed=seed)
+        return random_vectors(seed=seed)
     if name == "reflexive":
-        return reflexive_fan(polytope_id=polytope_id), reflexive_vc(polytope_id=polytope_id)
+        return reflexive_vectors(polytope_id=polytope_id)
     if name == "trunc_oct":
-        return trunc_oct_fan(), trunc_oct_vc()
+        return trunc_oct_vectors()
     raise ValueError(
-        f"Unknown shape {name!r}. Choose from: cube, random, reflexive, trunc_oct"
+        f"Unknown shape {name!r}. Choose from: {', '.join(_SHAPES)}"
     )
+
+
+def vectors_to_fan(vectors: list[list[int]]) -> Fan:
+    """Triangulate a list of integer vectors into a fan.
+
+    Parameters
+    ----------
+    vectors : list[list[int]]
+        Integer 3-vectors.
+
+    Returns
+    -------
+    Fan
+        A triangulated fan of the vectors.
+    """
+    return VectorConfiguration(vectors).triangulate()
+
+
+def load_shape(
+    name: str,
+    *,
+    seed: int = 1102,
+    polytope_id: int = 0,
+    n: int = 3,
+) -> Fan:
+    """Generate vectors and triangulate into a fan in one step.
+
+    Parameters
+    ----------
+    name : str
+        One of ``"cube"``, ``"random"``, ``"reflexive"``, ``"trunc_oct"``.
+    seed : int, optional
+        RNG seed for ``"random"`` shapes.
+    polytope_id : int, optional
+        Polytope index for ``"reflexive"`` shapes (0–4318).
+    n : int, optional
+        Cube size for ``"cube"`` shapes.
+
+    Returns
+    -------
+    Fan
+        A triangulated fan.
+    """
+    return vectors_to_fan(get_vectors(name, seed=seed, polytope_id=polytope_id, n=n))

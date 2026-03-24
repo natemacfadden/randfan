@@ -116,12 +116,12 @@ def main() -> None:
     _fix_negative_args()
     args = _parse_args()
 
-    from shapes import load_shape
-    fan, vc = load_shape(
-        args.shape,
-        seed=args.seed,
-        polytope_id=args.polytope,
-    )
+    from regfans import VectorConfiguration
+    from shapes import get_vectors
+
+    vectors = get_vectors(args.shape, seed=args.seed, polytope_id=args.polytope)
+    vc  = VectorConfiguration(vectors)
+    fan = vc.triangulate()
 
     initial_pos       = _parse_vec_arg(args.pos)     if args.pos     else None
     initial_heading   = _parse_vec_arg(args.heading) if args.heading else None

@@ -107,6 +107,22 @@ def _fetch_vectors(polytope_id: int) -> list[list[int]]:
     return vectors
 
 
+def reflexive_vectors(polytope_id: int = 0) -> list[list[int]]:
+    """Return integer lattice points for a 3D reflexive polytope.
+
+    Parameters
+    ----------
+    polytope_id : int, optional
+        Polytope index in [0, 4318]. Defaults to 0.
+
+    Returns
+    -------
+    list[list[int]]
+        Non-origin integer lattice points.
+    """
+    return _fetch_vectors(polytope_id)
+
+
 def reflexive_vc(polytope_id: int = 0) -> VectorConfiguration:
     """Return the VectorConfiguration of a 3D reflexive polytope.
 
