@@ -6,7 +6,15 @@ from __future__ import annotations
 
 import curses
 import math
+import time
+import threading
 from typing import TYPE_CHECKING
+
+try:
+    from pynput import keyboard as _pynput_kb
+    _HAS_PYNPUT = True
+except ImportError:
+    _HAS_PYNPUT = False
 
 import numpy as np
 
@@ -241,7 +249,7 @@ def _fill_triangle(
                 pass
 
 
-_COLOR_LABELS  = ("none", "radius", "sun")
+_COLOR_LABELS  = ("sun", "radius", "wireframe")
 # Symbol styles: (label, ramp_string).  Brightness t∈[0,1] indexes the ramp.
 _SYMBOL_STYLES: tuple = (
     ("block",   "\u2591\u2592\u2593\u2588"),   # ░▒▓█  — block shading
@@ -260,6 +268,7 @@ _SUN_POS = _SUN_POS / float(np.linalg.norm(_SUN_POS)) * 20.0
 _SUN_BRIGHTNESS   = float(np.dot(_SUN_POS - np.array([1.0, 1.0, 1.0]),
                                   _SUN_POS - np.array([1.0, 1.0, 1.0])))
 _SUN_AMBIENT      = 0.12   # base illumination on all surfaces, including shadowed ones
+_SUN_MAX          = 0.72   # cap on sun brightness (prevents over-saturation at peak)
 _DIM_LEVEL        = 0.45   # default brightness when flashlight is off
 
 
@@ -614,7 +623,7 @@ class Renderer:
           aiming at, or `None`.
         - `locked`: Whether movement is locked.
         - `allow_deletion`: Whether deletion mode is active.
-        - `color_mode`: Fill mode — 0 none, 1 radius, 2 sun.
+        - `color_mode`: Fill mode — 0 sun, 1 radius, 2 wireframe.
         - `flashlight`: Overlay flashlight cone (independent of color mode).
 
         **Returns:**
@@ -726,7 +735,7 @@ class Renderer:
                     _draw_line(scr, prev[0] + 1, prev[1], row_w + 1, col_w, ch, attr)
                 prev = (row_w, col_w)
 
-        if color_mode == 1:
+        if color_mode == 1:  # radius
             _r_max = float(
                 np.linalg.norm(fan.vectors(), axis=1).max()
             ) or 1.0
@@ -834,7 +843,7 @@ class Renderer:
                         break
                 _fl_occluded[_ct0] = not _ok
 
-        if color_mode == 2:
+        if color_mode == 0:  # sun
             # Rotate the sun position around the z-axis by sun_angle.
             _sc, _ss = float(np.cos(sun_angle)), float(np.sin(sun_angle))
             _sun_pos_cur = np.array([
@@ -925,7 +934,7 @@ class Renderer:
                 pair = _RADIUS_PAIR_START + round(t * (_n_r - 1))
                 return _sym_char(t), curses.color_pair(pair) | curses.A_BOLD
 
-        elif color_mode == 2:
+        elif color_mode == 0:  # sun
             _sun_factor_ref = [1.0]
             def _shade_fn(  # type: ignore[misc]
                 pos: np.ndarray, normal: np.ndarray,
@@ -941,7 +950,7 @@ class Renderer:
                     t = _SUN_AMBIENT
                 else:
                     lam = max(0.0, float(np.dot(n, to_sun / dist)))
-                    t = min(1.0, _SUN_AMBIENT
+                    t = min(_SUN_MAX, _SUN_AMBIENT
                             + factor * (1.0 - _SUN_AMBIENT) * lam * _SUN_BRIGHTNESS / (dist * dist))
                 # Additive flashlight: lifts dark areas noticeably, barely
                 # visible in already-bright sun-lit areas.
@@ -974,9 +983,9 @@ class Renderer:
                 if any(d > 0 for d in dots):
                     sphere_front_fill.add(ct)
 
-            # Fill pass (color_mode != 0): back-to-front, correct arc-bounded
+            # Fill pass (color_mode != 2): back-to-front, correct arc-bounded
             # geometry via back-projection.
-            if color_mode != 0:
+            if color_mode != 2:
                 _sorted_sph = sorted(
                     sphere_front_fill,
                     key=lambda ct: float(
@@ -1053,7 +1062,7 @@ class Renderer:
                 else:
                     _brt_ref[0] = _DIM_LEVEL
                 if _shade_fn is not None:
-                    if color_mode == 2 and _sun_factor_ref is not None:
+                    if color_mode == 0 and _sun_factor_ref is not None:
                         _sun_factor_ref[0] = _sun_factor.get(ct, 0.0)
                     _fill_triangle(
                         scr, pts, "\u2592", 0,  # type: ignore[arg-type]
@@ -1396,12 +1405,15 @@ def run_display_demo(
     **Returns:**
     Nothing.
     """
-    TURN       = 0.12
-    MAX_SPEED  = 0.15   # top speed (arc-length per keypress)
-    MIN_SPEED  = 0.01
-    ACCEL      = 0.006  # speed gain per forward keypress
+    TURN       = 0.04   # min turn rate (radians per frame at 60 fps)
+    MAX_TURN   = 0.10   # max turn rate
+    TURN_ACCEL = 0.006  # turn rate gain per frame
+    MAX_SPEED  = 0.11   # top speed (arc-length per frame at 60 fps)
+    MIN_SPEED  = 0.003
+    ACCEL      = 0.004  # speed gain per frame
     DECEL      = 0.78   # speed multiplier applied when over-turning
-    LAT_ACCEL  = 0.006  # max lateral "acceleration"; critical speed = LAT_ACCEL/TURN
+    LAT_ACCEL  = 0.002  # max lateral "acceleration"; critical speed = LAT_ACCEL/TURN
+    _FRAME_DT    = 1.0 / 60.0  # target frame duration (seconds)
     # Normalise display so vectors of max norm project to a fixed visual radius.
     _TARGET_NORM    = 1.9
     _max_norm       = float(np.linalg.norm(fan.vectors(), axis=1).max()) or 1.0
@@ -1435,7 +1447,7 @@ def run_display_demo(
         curses.curs_set(0)
         stdscr.keypad(True)
         curses.mousemask(0)
-        stdscr.timeout(50)   # non-blocking so agent and manual modes can share the loop
+        stdscr.nodelay(True)  # non-blocking; timing via time.sleep
         _pos0 = initial_pos     if initial_pos     is not None else [1.0, 0.2, 0.1]
         _hdg0 = initial_heading if initial_heading is not None else [0.0, 1.0, 0.0]
         if agent is None:
@@ -1454,8 +1466,41 @@ def run_display_demo(
         symbol_mode    = 0
         agent_active   = agent is not None
         _speed         = LAT_ACCEL / TURN  # start at the critical speed
+        _turn_rate     = TURN
         _sun_angle     = 0.0
-        _SUN_ROT_RATE  = 0.005             # radians per frame (~36°/min at 20 fps)
+        _SUN_ROT_RATE  = 0.005 / 3        # radians per frame at 60 fps
+
+        # OS-level key press/release tracking via pynput.
+        # _pressed is updated from a background thread; read each frame.
+        _pressed: set[int] = set()
+        _kb_listener = None
+        _use_pynput  = False
+        _lock        = threading.Lock()
+        if _HAS_PYNPUT:
+            try:
+                _KEY_MAP = {
+                    _pynput_kb.Key.up:    curses.KEY_UP,
+                    _pynput_kb.Key.down:  curses.KEY_DOWN,
+                    _pynput_kb.Key.left:  curses.KEY_LEFT,
+                    _pynput_kb.Key.right: curses.KEY_RIGHT,
+                }
+                def _on_press(k):
+                    c = _KEY_MAP.get(k)
+                    if c is not None:
+                        with _lock: _pressed.add(c)
+                def _on_release(k):
+                    c = _KEY_MAP.get(k)
+                    if c is not None:
+                        with _lock: _pressed.discard(c)
+                _kb_listener = _pynput_kb.Listener(
+                    on_press=_on_press, on_release=_on_release)
+                _kb_listener.start()
+                _use_pynput = True
+            except Exception:
+                _kb_listener = None
+        # TTL fallback state (used when pynput unavailable/failed)
+        _KEY_TTL  = 0.12
+        _last_seen: dict[int, float] = {}
 
         nonlocal_fan  = [fan]
         _irregularity = [not fan.is_regular()]   # updated on every flip
@@ -1537,54 +1582,87 @@ def run_display_demo(
                           flashlight=flashlight_on, symbol_mode=symbol_mode)
             _sun_angle += _SUN_ROT_RATE
             stdscr.refresh()
-            key = stdscr.getch()
-            if   key == ord("q"):  break
-            elif key == ord("p"):  _pending_prints.append(_snapshot(nonlocal_fan[0]))
-            elif key == ord("a"):  agent_active = not agent_active
-            elif key == ord("s"):  sphere_mode = not sphere_mode
-            elif key == ord("d"):  allow_deletion = not allow_deletion
-            elif key == ord("f"):  locked = not locked
-            elif key == ord("c"):  color_mode = (color_mode + 1) % len(_COLOR_LABELS)
-            elif key == ord("y"):  symbol_mode = (symbol_mode + 1) % len(_SYMBOL_STYLES)
-            elif key == ord("l"):  flashlight_on = not flashlight_on
-            elif key == ord("z"):
-                _p = _flashlight_debug_dump(player, nonlocal_fan[0], stdscr, _view_scale)
-                _pending_prints.append(f"[flashlight debug → {_p}]")
-            elif not agent_active:
-                if key == curses.KEY_UP:
-                    _try_move(_speed)
+
+            # Drain ALL pending input this frame so terminal key-repeat
+            # buffering cannot cause movement to continue after key release.
+            _move_keys: set[int] = set()
+            _MOVE_SET = {curses.KEY_UP, curses.KEY_DOWN,
+                         curses.KEY_LEFT, curses.KEY_RIGHT}
+            _quit = False
+            while True:
+                key = stdscr.getch()
+                if key == -1:
+                    break
+                if key in _MOVE_SET:
+                    _move_keys.add(key)
+                elif key == ord("q"):
+                    _quit = True
+                elif key == ord("p"):  _pending_prints.append(_snapshot(nonlocal_fan[0]))
+                elif key == ord("a"):  agent_active = not agent_active
+                elif key == ord("s"):  sphere_mode = not sphere_mode
+                elif key == ord("d"):  allow_deletion = not allow_deletion
+                elif key == ord("f"):  locked = not locked
+                elif key == ord("c"):  color_mode = (color_mode + 1) % len(_COLOR_LABELS)
+                elif key == ord("y"):  symbol_mode = (symbol_mode + 1) % len(_SYMBOL_STYLES)
+                elif key == ord("l"):  flashlight_on = not flashlight_on
+                elif key == ord("z"):
+                    _p = _flashlight_debug_dump(player, nonlocal_fan[0], stdscr, _view_scale)
+                    _pending_prints.append(f"[flashlight debug → {_p}]")
+            if _quit:
+                break
+
+            # Determine which movement keys are currently active.
+            if _use_pynput:
+                with _lock:
+                    _active = _pressed.copy()
+            else:
+                _now = time.monotonic()
+                for _k in _move_keys:
+                    _last_seen[_k] = _now
+                _active = {_k for _k, _t in _last_seen.items()
+                           if _now - _t <= _KEY_TTL}
+
+            if not agent_active:
+                _fwd   = curses.KEY_UP    in _active
+                _back  = curses.KEY_DOWN  in _active
+                _left  = curses.KEY_LEFT  in _active
+                _right = curses.KEY_RIGHT in _active
+
+                if _fwd or _back:
+                    _try_move(_speed if _fwd else -_speed)
                     _speed = min(MAX_SPEED, _speed + ACCEL)
-                    curses.flushinp()   # drop burst of scroll events
-                elif key == curses.KEY_DOWN:
-                    _try_move(-_speed)
-                    _speed = min(MAX_SPEED, _speed + ACCEL)
-                    curses.flushinp()
-                elif key == curses.KEY_LEFT:
-                    player.turn(-TURN)
-                    # Brake if requested curvature exceeds centripetal limit.
-                    if TURN * _speed > LAT_ACCEL:
+                else:
+                    _speed = max(MIN_SPEED, _speed * 0.85)
+
+                if _left or _right:
+                    _turn_rate = min(MAX_TURN, _turn_rate + TURN_ACCEL)
+                    if _left:
+                        player.turn(-_turn_rate)
+                    else:
+                        player.turn(_turn_rate)
+                    if _turn_rate * _speed > LAT_ACCEL:
                         _speed = max(MIN_SPEED, _speed * DECEL)
-                    curses.flushinp()
-                elif key == curses.KEY_RIGHT:
-                    player.turn(TURN)
-                    if TURN * _speed > LAT_ACCEL:
-                        _speed = max(MIN_SPEED, _speed * DECEL)
-                    curses.flushinp()
+                else:
+                    _turn_rate = TURN
+
             elif agent_active:
                 _RATE_FACTOR = 1.5
-                _RATE_MIN    = 0.05   # 1 step per 20 frames
-                _RATE_MAX    = 8.0    # 8 steps per frame
+                _RATE_MIN    = 0.05
+                _RATE_MAX    = 8.0
                 _NUDGE       = 0.20
-                if   key == curses.KEY_UP:
+                if   curses.KEY_UP    in _move_keys:
                     _agent_rate = min(_RATE_MAX, _agent_rate * _RATE_FACTOR)
-                    curses.flushinp()
-                elif key == curses.KEY_DOWN:
+                elif curses.KEY_DOWN  in _move_keys:
                     _agent_rate = max(_RATE_MIN, _agent_rate / _RATE_FACTOR)
-                    curses.flushinp()
-                elif key == curses.KEY_LEFT:
+                if   curses.KEY_LEFT  in _move_keys:
                     _agent_obj.player.turn(-_NUDGE)
-                elif key == curses.KEY_RIGHT:
+                elif curses.KEY_RIGHT in _move_keys:
                     _agent_obj.player.turn(_NUDGE)
+
+            time.sleep(_FRAME_DT)
+
+        if _kb_listener is not None:
+            _kb_listener.stop()
 
     curses.wrapper(_main)
     for i, s in enumerate(_pending_prints):
