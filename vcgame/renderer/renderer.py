@@ -35,9 +35,11 @@ _SUN_REF      = np.array([1.0, 1.0, 1.0])
 _COLOR_LABELS  = ("wire", "radius", "sun")
 # Symbol styles: (label, ramp_string).  Brightness t∈[0,1] indexes the ramp.
 _SYMBOL_STYLES: tuple = (
-    ("block",   "\u2591\u2592\u2593\u2588"),   # ░▒▓█  — block shading
-    ("digits",  "123456789"),                   # numeric brightness 1–9
-    ("ascii",   " .:-=+*#%@"),                  # classic ASCII density ramp
+    ("block",    "\u2591\u2592\u2593\u2588"),            # ░▒▓█
+    ("braille",  "\u2801\u2803\u2807\u2847\u28c7\u28f7\u28ff"),  # ⠁⠃⠇⡇⣇⣷⣿
+    ("quadrant", " \u2596\u259a\u2599\u2588"),           # (sp)▖▚▙█
+    ("vert",     "\u258f\u258e\u258d\u258c\u258b\u258a\u2589\u2588"),  # ▏▎▍▌▋▊▉█
+    ("horiz",    "\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588"),  # ▁▂▃▄▅▆▇█
 )
 _M3_HEIGHT     = 0.003  # player elevation above current face (flashlight mode)
 _M3_THETA_MAX  = 55.0   # flashlight cone half-angle from heading, degrees
@@ -1436,14 +1438,14 @@ class Renderer:
         lock_attr  = (curses.color_pair(2) | curses.A_BOLD
                       if locked else curses.color_pair(4))
         col_str    = f"  [1/2]fill:{_COLOR_LABELS[color_mode]}"
-        sym_str    = f"  [8/9/0]sym:{_SYMBOL_STYLES[symbol_mode % len(_SYMBOL_STYLES)][0]}"
+        sym_str    = f"  [6-0]sym:{_SYMBOL_STYLES[symbol_mode % len(_SYMBOL_STYLES)][0]}"
         thk_str    = f"  [T]thick:{edge_thickness}"
         lit_str    = "  [F]lash:ON" if flashlight else "  [F]lash:off"
         lit_attr   = (curses.color_pair(2) | curses.A_BOLD
                       if flashlight else curses.color_pair(4))
 
         # ── HUD row 0 (rows-2): [q]uit  cone=…  [S]sphere  [1/2]fill  [D]el  [A]agent  [P]dbg
-        # ── HUD row 1 (rows-1):          facet=…  [8/9/0]sym  [F]lash  [L]fix
+        # ── HUD row 1 (rows-1):          facet=…  [6-0]sym  [F]lash  [L]fix
         try:
             _blank = " " * (cols - 1)
             for _hr in range(_HUD_ROWS):
