@@ -489,8 +489,6 @@ def run_display_demo(
                         color_mode = 1 if color_mode != 1 else 0
                     elif key == ord("2"):
                         color_mode = 2 if color_mode != 2 else 0
-                    elif key == ord("3"):
-                        color_mode = 3 if color_mode != 3 else 0
                     elif key == ord("8"):
                         symbol_mode = 0
                     elif key == ord("9"):

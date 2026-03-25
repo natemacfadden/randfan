@@ -32,7 +32,7 @@ _SLERP_STEP   = 0.04   # arc-length step for spherical arc sampling
 _SUN_DISTANCE = 20.0
 _SUN_REF      = np.array([1.0, 1.0, 1.0])
 
-_COLOR_LABELS  = ("off", "radius", "sun")
+_COLOR_LABELS  = ("wire", "radius", "sun")
 # Symbol styles: (label, ramp_string).  Brightness t∈[0,1] indexes the ramp.
 _SYMBOL_STYLES: tuple = (
     ("block",   "\u2591\u2592\u2593\u2588"),   # ░▒▓█  — block shading
@@ -494,7 +494,7 @@ def _compute_brightness(
     curr_idx : int
         Index of current cone in stacked arrays (skipped in flashlight test).
     color_mode : int
-        0 = wireframe (not called), 1 = radius, 2 = sun.
+        0 = wire (not called), 1 = radius, 2 = sun.
     r_max : float
         Maximum vector magnitude (used for radius normalisation).
     sun_pos : np.ndarray or None
@@ -1387,13 +1387,13 @@ class Renderer:
         lock_str   = "  [L]fix:ON" if locked else "  [L]fix:off"
         lock_attr  = (curses.color_pair(2) | curses.A_BOLD
                       if locked else curses.color_pair(4))
-        col_str    = f"  [1/2/3]fill:{_COLOR_LABELS[color_mode]}"
+        col_str    = f"  [1/2]fill:{_COLOR_LABELS[color_mode]}"
         sym_str    = f"  [8/9/0]sym:{_SYMBOL_STYLES[symbol_mode % len(_SYMBOL_STYLES)][0]}"
         lit_str    = "  [F]light:ON" if flashlight else "  [F]light:off"
         lit_attr   = (curses.color_pair(2) | curses.A_BOLD
                       if flashlight else curses.color_pair(4))
 
-        # ── HUD row 0 (rows-2): [q]uit  cone=…  [S]sphere  [1/2/3]fill  [D]el  [A]agent  [P]dbg
+        # ── HUD row 0 (rows-2): [q]uit  cone=…  [S]sphere  [1/2]fill  [D]el  [A]agent  [P]dbg
         # ── HUD row 1 (rows-1):          facet=…  [8/9/0]sym  [F]light  [L]fix
         try:
             _blank = " " * (cols - 1)
