@@ -1,7 +1,7 @@
 # vcgame
 *[Nate MacFadden](https://github.com/natemacfadden), Liam McAllister Group, Cornell*
 
-![demo](docs/vcgame.gif)
+<p align="center"><img src="docs/vcgame.gif"/></p>
 
 An interactive terminal game built around *vector configurations* and their *triangulations*.
 
@@ -25,39 +25,14 @@ game/        stage 3 (interactive game loop, player, agents)
 Stages can be used independently. For example, stages 1 and 2 together support
 generating, rendering, and saving shapes without any game logic.
 
-## Stage 1 (shape generation)
-
-### CLI
-
-Print integer vectors for a named shape as JSON:
+## Running the game
 
 ```bash
-python -m shapes cube --n 3
-python -m shapes cube --n 5
-python -m shapes random --seed 42
-python -m shapes reflexive --polytope_id 7
-python -m shapes trunc_oct
-```
-
-Each command prints a JSON array of integer 3-vectors to stdout, e.g.:
-
-```
-[[-1,-1,-1], [-1,-1,0], ..., [1,1,1]]
-```
-
-### Python API
-
-```python
-from shapes import get_vectors, vectors_to_fan, load_shape
-
-# Stage 1: integer vectors only
-vectors = get_vectors("cube", n=3)          # list[list[int]]
-
-# Stage 2: triangulate into a fan
-fan = vectors_to_fan(vectors)               # regfans.Fan
-
-# Or both in one step
-fan = load_shape("cube", n=3)
+python main.py
+python main.py --shape trunc_oct
+python main.py --shape random --seed 42
+python main.py --shape reflexive --polytope_id 7
+python main.py --shape cube --n 5 --color 1
 ```
 
 ### Available shapes
@@ -68,16 +43,6 @@ fan = load_shape("cube", n=3)
 | `random` | Random centrally-symmetric lattice vectors on convex hull | `--seed` |
 | `reflexive` | Lattice points of a 3D reflexive polytope (4319 available) | `--polytope_id` (0–4318) |
 | `trunc_oct` | Vertices of the truncated octahedron | none |
-
-## Running the game
-
-```bash
-python main.py
-python main.py --shape trunc_oct
-python main.py --shape random --seed 42
-python main.py --shape reflexive --polytope_id 7
-python main.py --shape cube --n 5 --color 1 --flashlight
-```
 
 ## Development note
 
