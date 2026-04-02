@@ -24,10 +24,24 @@ The greedy method seems to always generate a fine triangulation for a PC (i.e., 
 No duplication checking is performed...
 
 ## Compilation/running
-Compile a demo with
-`clang -g -o rfp src/demo.c `
 
-Run this with (assuming you have also compile `ncube`... if not, go to the data directory and run `clang -g -o ncube ncube.c `)
-`./data/ncube 5 | ./rfp -n 1000`
-or even
-`python live_triplot.py --n 1000`
+Compile the demo and the ncube utility:
+```bash
+clang -o rfp src/demo.c
+clang -o ncube src/ncube.c
+```
+
+`ncube` prints the vertices of the $n$-dimensional unit cube $[0,1]^n$ as a vector configuration. Run with:
+```bash
+./ncube 5 | ./rfp -r -f -n 10
+```
+
+Example configurations are also provided in `../data/`. Run with:
+```bash
+./rfp -r -f < ../data/491_big2face.dat
+```
+
+For a live plot of triangulations (requires matplotlib):
+```bash
+python live_triplot.py --random --fine --data ../data/491_big2face.dat
+```
