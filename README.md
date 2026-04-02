@@ -36,6 +36,10 @@ python pushing/live_triplot.py --random --fine --data ./data/491_big2face.dat
 No external dependencies for the core library — just a C compiler. For the interactive plot,
 we use matplotlib to display the triangulations.
 
+## grow2d *(coming soon)*
+
+Random triangulations of lattice polygons.
+
 ## vcgame
 
 An interactive terminal game built around **triangulations of 3D lattice vector
@@ -55,9 +59,6 @@ python main.py --shape trunc_oct
 python main.py --shape reflexive --polytope_id 7
 ```
 
-Built on [regfans](https://github.com/natemacfadden/regfans). Much of this project was
-developed with the assistance of [Claude Code](https://claude.ai/claude-code) (Anthropic).
-
-## grow2d *(coming soon)*
-
-Random triangulations of lattice polygons.
+Much of `vcgame` was developed with the assistance of
+[Claude Code](https://claude.ai/claude-code) (Anthropic), as a test/warm-up project for
+semi-hands-off agentic software development for projects semi-close to research.
