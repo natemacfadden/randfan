@@ -1,14 +1,14 @@
 # vcgame
+*[Nate MacFadden](https://github.com/natemacfadden), Liam McAllister Group, Cornell*
 
-A game built around *vector configurations* and their *triangulations*.
+An interactive terminal game built around *vector configurations* and their *triangulations*.
 
-The player navigates on a simplicial fan (a triangulation of a 3D lattice
-vector configuration) by moving along geodesics on the 2-sphere. Crossing a
-wall between cones performs a bistellar flip, changing the triangulation. The
-fan can be locked to allow exploration without modification.
+The player navigates a simplicial fan (a triangulation of a 3D lattice vector configuration)
+by moving along geodesics on the 2-sphere. Crossing a wall between cones performs a
+**bistellar flip**, modifying the triangulation in real time. The fan can be locked for
+free exploration without flipping.
 
-Built on [regfans](https://github.com/natemacfadden/regfans) for triangulation
-computation.
+Requires [regfans](https://github.com/natemacfadden/regfans) and numpy. pynput is recommended for best key input handling but the game falls back to terminal input if unavailable.
 
 ## Project structure
 
@@ -77,11 +77,8 @@ python main.py --shape reflexive --polytope_id 7
 python main.py --shape cube --n 5 --color 1 --flashlight
 ```
 
-## Status
-
-Early development. Intended to be small.
-
 ## Development note
 
-Much of this project was developed with the assistance of
-[Claude Code](https://claude.ai/claude-code) (Anthropic).
+This project was developed with the assistance of
+[Claude Code](https://claude.ai/claude-code) (Anthropic), as a test/warm-up project for
+semi-hands-off agentic software development for projects semi-close to research.
