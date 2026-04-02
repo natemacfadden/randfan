@@ -29,7 +29,7 @@ clang -o rfp pushing/src/demo.c
 or, more interactively
 
 ```
-python pushing/live_triplot.py --n 1000
+python pushing/live_triplot.py --random --fine --data ./data/491_big2face.dat
 ```
 
 No external dependencies — just a C compiler.
