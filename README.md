@@ -5,7 +5,7 @@ A collection of triangulation toys for studying lattice point/vector configurati
 
 ## pushing
 
-A C library for constructing **pushing triangulations** of point/vector configurations,
+A C library for constructing pushing triangulations of point/vector configurations,
 with optional randomization and fineness.
 
 A *pushing triangulation* assigns an order to the points/vectors, constructing a
