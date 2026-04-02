@@ -1,4 +1,6 @@
-# Overview
+# pushing
+*[Nate MacFadden](https://github.com/natemacfadden), Liam McAllister Group, Cornell*
+
 Constructs a pushing triangulation of a point/vector configuration. Optional configurations include
 - constructing a *random* pushing triangulation
 - constructing a random & *fine* pushing triangulation (or at least try to).

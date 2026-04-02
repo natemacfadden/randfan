@@ -1,7 +1,15 @@
-The source code for the pushing triangulation program. The library is `pushing.h`. This contains everything necessary to generate (optionally random, optionally random&fine) pushing triangulations of point/vector configurations. If you want better performance for configurations with moderate dimension, run `hardcoded_leibniz.py` which writes a `det.h` file with hardcoded Laplace expansions of the determinant. This gives significant speedups in some cases. If no `det.h` file exists, the code defaults to a cofactor expansion.
+# src
 
-As a simple demo, see `demo.c`. This is an example application which reads vectors and then uses `pushing.h` to construct the pushing triangulation(s) of the associated configuration. For some example configurations, see `../data/`.
+Source code for the pushing triangulation library.
 
-Also included is `ncube.c`, a small utility that prints the vertices of the $n$-dimensional unit cube $[0,1]^n$ as a vector configuration. Compile with `clang -o ncube ncube.c` and pipe into `rfp`.
+## pushing.h
 
-A more interactive demo is in `live_triplot.py`, which calls the compiled `rfp` binary repeatedly and plots the resulting triangulations live.
+The core library. A single-header C implementation that generates (optionally random, optionally random & fine) pushing triangulations of point/vector configurations. If you want better determinant performance for moderate-dimensional configurations, run `hardcode_leibniz.py`, which writes a `det.h` file with hardcoded Laplace expansions. This gives significant speedups in some cases. If no `det.h` exists, the code defaults to cofactor expansion.
+
+## demo.c
+
+A minimal application that reads a vector configuration and uses `pushing.h` to construct pushing triangulations. For example configurations, see `../data/`. For a live interactive demo, see `../live_triplot.py`.
+
+## ncube.c
+
+Utility that prints the vertices of the $n$-dimensional unit cube $[0,1]^n$ as a vector configuration, for use as input to `rfp`.
