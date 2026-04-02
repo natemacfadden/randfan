@@ -1,6 +1,8 @@
 # vcgame
 *[Nate MacFadden](https://github.com/natemacfadden), Liam McAllister Group, Cornell*
 
+![demo](docs/vcgame.gif)
+
 An interactive terminal game built around *vector configurations* and their *triangulations*.
 
 The player navigates a simplicial fan (a triangulation of a 3D lattice vector configuration)
