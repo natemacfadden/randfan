@@ -24,7 +24,7 @@ Example configurations (various dimensions) are provided in `data/`. Compile and
 
 ```bash
 clang -o rfp pushing/src/demo.c
-./rfp < ./data/20x20x20.dat
+./rfp < ./data/491_big2face.dat
 ```
 
 or, more interactively
