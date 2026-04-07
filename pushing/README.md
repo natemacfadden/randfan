@@ -44,19 +44,34 @@ clang -o rfp src/demo.c
 clang -o ncube src/ncube.c
 ```
 
-`ncube` prints the vertices of the $n$-dimensional unit cube $[0,1]^n$ as a vector configuration. Run with:
+### Quick start: n-cube
+
+`ncube` prints the vertices of the $n$-dimensional unit cube $[0,1]^n$ (homogenized, so each vertex is an $(n+1)$-dimensional vector) and is the easiest way to get started:
+
 ```bash
-./ncube 5 | ./rfp -r -f -n 10
+# 10 random fine triangulations of the 4D unit cube (as a 5D VC)
+./ncube 4 | ./rfp -r -f -n 10
+
+# pushing triangulation of the 5D unit cube, in input order
+./ncube 5 | ./rfp
+
+# single random triangulation of the 3D unit cube
+./ncube 3 | ./rfp -r
 ```
 
-Example configurations are also provided in `../data/`. Run with:
-```bash
-./rfp -r -f < ../data/491_big2face.dat
-```
+### Example data file
 
-For a live plot of triangulations (requires matplotlib):
+An example point configuration is provided in `data/`:
+
 ```bash
-python live_triplot.py --random --fine --data ../data/491_big2face.dat
+# single random fine triangulation of the 491_big2face geometry
+./rfp -r -f < data/491_big2face.dat
+
+# 10 triangulations, seeded
+./rfp -r -f -n 10 -s 42 < data/491_big2face.dat
+
+# live plot (requires matplotlib)
+python live_triplot.py --random --fine --data data/491_big2face.dat
 ```
 
 ## Triangulation population comparison
