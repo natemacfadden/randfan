@@ -298,7 +298,7 @@ if __name__ == "__main__":
     all_c_plotted = sorted(set(rfp_c) | set(cyt_c))
     ax.set_xticks(all_c_plotted)
     ax.set_xticklabels(all_c_plotted, fontsize=7)
-    ax.set_xlabel("c   ([0,c]² lattice points)")
+    ax.set_xlabel("c   ([0,c]^2 lattice points)")
     ax.set_ylabel(f"Time (s) for {N_TRIANGS} triangulations")
     ax.set_title(
         "rfp vs CYTools random_triangulations_fast\n"

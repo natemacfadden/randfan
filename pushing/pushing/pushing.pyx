@@ -36,7 +36,7 @@ def pushing(pts, bint fine=True, bint random=True, seed=0,
         a d-dimensional vector. For example, the 2D square [[0,0],[1,0],[0,1],
         [1,1]] becomes [[0,0,1],[1,0,1],[0,1,1],[1,1,1]].
     fine : bool, optional
-        Require a fine triangulation — one that uses every input vector
+        Require a fine triangulation -- one that uses every input vector
         (default: True). Implies random=True. May deadlock for general VCs;
         always succeeds for acyclic VCs (point configurations).
     random : bool, optional
@@ -58,7 +58,7 @@ def pushing(pts, bint fine=True, bint random=True, seed=0,
             -2: memory allocation problem
             -3: zero vectors input
             -4: couldn't find initial simplex
-            -5: deadlock — couldn't add a new simplex (fine VC mode only)
+            -5: deadlock -- couldn't add a new simplex (fine VC mode only)
             -6: constructed too many simplices
           -100: error splitting a cone
     """
